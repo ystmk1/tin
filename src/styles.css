@@ -505,8 +505,13 @@ html.dokki-no-splash #dokki-splash { display: none; }
   flex: 1;
   padding-top: 4px;
 }
+/* The display-weight title has ~1–2px of left optical sidebearing
+   that the lighter libinfo/buttons don't share, so the items below
+   the title visually drift left of it. A tiny indent on each
+   non-title row re-aligns them to the title's first glyph. */
 .dokki-panel-libinfo {
   margin-top: 10px;
+  margin-left: 2px;
   color: var(--text-muted);
   font-size: 0.82rem;
   letter-spacing: -0.01em;
@@ -515,6 +520,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
   display: flex;
   gap: 6px;
   margin-top: 14px;
+  margin-left: 2px;
 }
 .dokki-libaction,
 .dokki-libsearch-btn {
@@ -536,7 +542,10 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 .dokki-libaction-quiet { opacity: 0.6; }
 .dokki-libsearch-btn {
-  margin-top: 6px;
+  /* Gap to the title above is now ~half the gap below to the status
+     chip in the tags row (head margin-bottom: 24, so 12 here). */
+  margin-top: 12px;
+  margin-left: 2px;
 }
 
 .dokki-panel-title-row {
@@ -648,6 +657,17 @@ html.dokki-no-splash #dokki-splash { display: none; }
   background: linear-gradient(180deg, transparent 60%, hsla(45, 90%, 60%, 0.35) 60%);
   font-weight: 500;
 }
+.dokki-panel-body .dokki-subheading {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.12rem;
+  letter-spacing: -0.015em;
+  color: var(--text-normal);
+  margin: 18px 0 6px;
+  line-height: 1.35;
+}
+.dokki-panel-body .dokki-subheading:first-child { margin-top: 0; }
 
 .dokki-panel-backdrop {
   position: fixed;

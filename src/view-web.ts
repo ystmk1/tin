@@ -672,21 +672,37 @@ function statusChipText(b: BookNote): string | undefined {
 // strip the outer pair at render time only — CSS already adds visual
 // curly quotes (“ ”) via ::before/::after, so the typed quotes would
 // double up. The source .md is never touched.
-const QUOTE_PAIRS: Record<string, string> = {
-  '"': '"',
-  "'": "'",
-  "“": "”", // " "
-  "‘": "’", // ' '
-  "「": "」",
-  "『": "』",
-};
+//
+// Lenient: any character considered an "opener" + any "closer" at the
+// ends counts as a wrapped pair, so we cover ASCII straight, curly,
+// CJK 「」『』, French «», low-9 „, etc. — and also ASCII " on both
+// ends (same char as opener and closer).
+const QUOTE_OPENERS = new Set([
+  '"', "'", "“", "‘", "「", "『", "«", "‹", "„", "‚", "＂", "＇",
+]);
+const QUOTE_CLOSERS = new Set([
+  '"', "'", "”", "’", "」", "』", "»", "›", "‟", "‛", "＂", "＇",
+]);
 function stripWrappingQuotes(s: string): string {
-  const t = s.trim();
-  if (t.length < 2) return s;
-  const expected = QUOTE_PAIRS[t[0]];
-  if (!expected) return s;
-  if (t[t.length - 1] !== expected) return s;
-  return t.slice(1, -1).trim();
+  let t = s.trim();
+  // Strip ends independently. If the user only bolded part of a dialogue
+  // (so only the leading quote is in the bold, or only the trailing one),
+  // we still want that single quote gone to avoid the doubled-quote look.
+  // Up to two passes covers the rare nested-quote case.
+  for (let i = 0; i < 2; i++) {
+    if (t.length === 0) break;
+    let changed = false;
+    if (QUOTE_OPENERS.has(t[0])) {
+      t = t.slice(1).trimStart();
+      changed = true;
+    }
+    if (t.length > 0 && QUOTE_CLOSERS.has(t[t.length - 1])) {
+      t = t.slice(0, -1).trimEnd();
+      changed = true;
+    }
+    if (!changed) break;
+  }
+  return t;
 }
 
 // Rounded star SVG path (chunky body, soft tips).
@@ -714,16 +730,26 @@ function renderRatingEl(rating: number): HTMLElement {
 }
 
 const BOLD_HTML = /\*\*([^*\n]+?)\*\*/g;
+// Subheadings (### Title) — used inside page bodies of short-story
+// collections etc. ## and # don't appear in user notes; ##### is the
+// page marker, parsed away earlier. We only handle exactly ###.
+const SUBHEADING_HTML = /^###[ \t]+(.+?)[ \t]*$/gm;
 function renderBodyHTML(body: string): string {
   const escaped = body
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+  // ### Title → block subheading. Run before bold/skips so the captured
+  // group text can still contain **bold** that gets processed later.
+  const withHeadings = escaped.replace(
+    SUBHEADING_HTML,
+    '<span class="dokki-subheading">$1</span>',
+  );
   // 3+ consecutive newlines (=2+ blank lines) represent an intentional skip
   // (middle of page skipped, or stitched-together continuous pages). Render
   // as a single normalized gap regardless of how many enters were typed.
   // A single blank line (\n\n, =book paragraph break) is preserved as-is
   // by the surrounding white-space: pre-wrap.
-  const withSkips = escaped.replace(/\n{3,}/g, '<span class="dokki-skip" aria-hidden="true"></span>');
+  const withSkips = withHeadings.replace(/\n{3,}/g, '<span class="dokki-skip" aria-hidden="true"></span>');
   return withSkips.replace(BOLD_HTML, "<strong>$1</strong>");
 }
