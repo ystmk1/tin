@@ -542,7 +542,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
 .dokki-panel-title-row {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 9px;
   flex-wrap: wrap;
 }
 .dokki-panel-inner h2 {
@@ -556,34 +556,32 @@ html.dokki-no-splash #dokki-splash { display: none; }
 .dokki-rating {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   color: var(--text-normal);
   user-select: none;
   white-space: nowrap;
-  /* keep stars aligned to the title's optical center */
-  line-height: 0;
+  /* h2 box height ≈ 1.45rem × 1.2 = 27.84px, stars are 18px → rating box height
+     matches via padding so flex align-items:center hits the same optical line */
+  height: calc(1.45rem * 1.2);
 }
 .dokki-star {
-  width: 19px;
-  height: 19px;
+  width: 18px;
+  height: 18px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.7;
   stroke-linejoin: round;
   stroke-linecap: round;
   display: block;
+  flex-shrink: 0;
 }
 .dokki-star.is-filled { fill: currentColor; }
-.dokki-panel-meta {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin-bottom: 24px;
-}
 .dokki-panel-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 8px;
   margin-bottom: 36px;
+  align-items: center;
 }
 .dokki-tag {
   font-size: 0.75rem;
@@ -591,6 +589,14 @@ html.dokki-no-splash #dokki-splash { display: none; }
   background: var(--background-secondary);
   padding: 4px 10px;
   border-radius: 99px;
+}
+.dokki-tag.dokki-status {
+  background: var(--text-normal);
+  color: var(--background-primary);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  padding: 5px 12px;
+  font-size: 0.78rem;
 }
 .dokki-panel-comment {
   margin: 0 0 24px;

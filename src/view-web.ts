@@ -84,17 +84,16 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
     inner.appendChild(head);
     renderHead(head, b);
 
-    const meta = document.createElement("div");
-    meta.className = "dokki-panel-meta";
-    const bits: string[] = [];
-    if (b.frontmatter.author) bits.push(b.frontmatter.author);
-    if (b.frontmatter.publisher) bits.push(b.frontmatter.publisher);
-    if (b.frontmatter.rawStatus) bits.push(b.frontmatter.rawStatus);
-    meta.textContent = bits.join(" · ");
-    inner.appendChild(meta);
-    if (b.frontmatter.tags.length) {
+    const status = statusChipText(b);
+    if (status || b.frontmatter.tags.length > 0) {
       const tags = document.createElement("div");
       tags.className = "dokki-panel-tags";
+      if (status) {
+        const chip = document.createElement("span");
+        chip.className = "dokki-tag dokki-status";
+        chip.textContent = status;
+        tags.appendChild(chip);
+      }
       for (const t of b.frontmatter.tags) {
         const span = document.createElement("span");
         span.className = "dokki-tag";
@@ -187,10 +186,22 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
       actions.append(change, remove);
       titleWrap.appendChild(actions);
     } else {
+      // No library metadata selected — surface the user's own frontmatter
+      // (author / publisher) in the same libinfo slot. Status is handled
+      // separately as a chip in the tags row.
+      const fmBits: string[] = [];
+      if (b.frontmatter.author) fmBits.push(b.frontmatter.author);
+      if (b.frontmatter.publisher) fmBits.push(b.frontmatter.publisher);
+      if (fmBits.length) {
+        const sub = document.createElement("div");
+        sub.className = "dokki-panel-libinfo";
+        sub.textContent = fmBits.join(" · ");
+        titleWrap.appendChild(sub);
+      }
       const search = document.createElement("button");
       search.className = "dokki-libsearch-btn";
       search.textContent = "+ 도서 정보 검색";
-      search.title = "국립중앙도서관에서 이 책을 검색해 표지·서지 정보를 연결";
+      search.title = "국립중앙도서관·알라딘에서 검색해 표지·서지 정보를 연결";
       search.addEventListener("click", () => openSearch(b));
       titleWrap.appendChild(search);
     }
@@ -641,6 +652,20 @@ function spanOf(text: string): HTMLElement {
   const s = document.createElement("span");
   s.textContent = text;
   return s;
+}
+
+function statusChipText(b: BookNote): string | undefined {
+  const fm = b.frontmatter;
+  switch (b.status) {
+    case "finished":
+      return fm.endDate ? `완독 · ${fm.endDate}` : "완독";
+    case "reading":
+      return "읽는 중";
+    case "stopped":
+      return fm.stoppedAtPage ? `p.${fm.stoppedAtPage} 중단` : "중단";
+    default:
+      return fm.rawStatus || undefined;
+  }
 }
 
 // When the bold excerpt is a dialogue wrapped in matching quotes,
