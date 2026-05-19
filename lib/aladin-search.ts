@@ -6,8 +6,8 @@
 // API: http://www.aladin.co.kr/ttb/api/ItemSearch.aspx
 // Doc: https://blog.aladin.co.kr/openapi
 
-import type { NlBookResult } from "./nl-search";
-import { formatAuthor } from "./author-format";
+import type { NlBookResult } from "./nl-search.js";
+import { formatAuthor } from "./author-format.js";
 
 const ALADIN_SEARCH_URL = "https://www.aladin.co.kr/ttb/api/ItemSearch.aspx";
 

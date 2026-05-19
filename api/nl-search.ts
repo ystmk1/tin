@@ -27,7 +27,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Dynamic import keeps any module-load error inside the try/catch.
-    const mod = await import("../lib/book-search");
+    // .js extension is required because package.json sets "type": "module",
+    // putting Node into strict ESM mode where extensionless specifiers fail.
+    const mod = await import("../lib/book-search.js");
     const payload = await mod.searchBooksCombined(q, { nlKey, aladinKey });
 
     res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");

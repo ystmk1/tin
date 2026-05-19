@@ -3,8 +3,8 @@
 // an ISBN are deduped — when both APIs return the same book, we keep Aladin
 // (which carries the cover) and graft NL's call number / detail link onto it.
 
-import { isJunkResult, NlBookResult, searchNlBooks } from "./nl-search";
-import { searchAladinBooks } from "./aladin-search";
+import { isJunkResult, type NlBookResult, searchNlBooks } from "./nl-search.js";
+import { searchAladinBooks } from "./aladin-search.js";
 
 export async function searchBooksCombined(
   query: string,

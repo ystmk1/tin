@@ -4,7 +4,7 @@
 //   - vite.config.ts middleware (local dev)
 // API doc: https://www.nl.go.kr/NL/contents/N31101000000.do (openAPI 자료검색)
 
-import { formatAuthor } from "./author-format";
+import { formatAuthor } from "./author-format.js";
 
 const NL_API_URL = "https://www.nl.go.kr/NL/search/openApi/search.do";
 
