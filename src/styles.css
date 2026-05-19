@@ -244,37 +244,147 @@ html.dokki-no-splash #dokki-splash { display: none; }
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
-.dokki-filters { 
-  display: flex; 
-  gap: 8px; 
-  align-items: center; 
+/* === Filter button + popover === */
+.dokki-filter-root {
+  position: relative;
 }
-.dokki-select {
-  appearance: none;
-  background-color: var(--background-primary);
+.dokki-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 8px;
-  padding: 8px 32px 8px 12px;
-  color: var(--text-normal);
-  font-size: 0.8rem;
+  padding: 7px 12px;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
   font-weight: 500;
-  font-family: inherit;
+  color: var(--text-muted);
   cursor: pointer;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8884' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 14px;
-  transition: all 0.2s;
+  transition: all 0.15s;
   letter-spacing: -0.01em;
 }
-.dokki-select:hover {
+.dokki-filter-btn:hover {
   border-color: var(--text-normal);
-  background-color: var(--background-secondary);
+  color: var(--text-normal);
 }
-.dokki-select:focus {
-  outline: none;
+.dokki-filter-btn.is-active {
+  background: var(--background-secondary);
+  color: var(--text-normal);
   border-color: var(--text-normal);
-  box-shadow: 0 0 0 1px var(--text-normal);
+}
+.dokki-filter-icon {
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.7;
+}
+.dokki-filter-badge {
+  display: none;
+  background: var(--text-normal);
+  color: var(--background-primary);
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 99px;
+  min-width: 18px;
+  text-align: center;
+  margin-left: 2px;
+  line-height: 1.4;
+}
+.dokki-filter-btn.is-active .dokki-filter-badge { display: inline-block; }
+
+.dokki-filter-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.14);
+  padding: 14px;
+  z-index: 30;
+  display: none;
+}
+.dokki-filter-popover.is-open {
+  display: block;
+  animation: dokki-popover-in 0.14s ease-out;
+}
+@keyframes dokki-popover-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.dokki-filter-popover-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 4px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.dokki-filter-popover-head > span {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--text-normal);
+  letter-spacing: -0.015em;
+}
+.dokki-filter-clear {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  padding: 3px 7px;
+  border-radius: 4px;
+}
+.dokki-filter-clear:hover { color: var(--text-normal); background: var(--background-secondary); }
+.dokki-filter-section { padding: 12px 4px 4px; }
+.dokki-filter-section + .dokki-filter-section {
+  border-top: 1px dashed var(--background-modifier-border);
+}
+.dokki-filter-section-label {
+  font-family: var(--font-ui);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.dokki-filter-section-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dokki-filter-chip {
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 99px;
+  padding: 4px 11px;
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+  letter-spacing: -0.01em;
+}
+.dokki-filter-chip:hover {
+  border-color: var(--text-normal);
+  color: var(--text-normal);
+}
+.dokki-filter-chip.is-active {
+  background: var(--text-normal);
+  color: var(--background-primary);
+  border-color: var(--text-normal);
+}
+.dokki-filter-empty {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  font-family: var(--font-ui);
 }
 
 /* === GRAPH === */
@@ -385,7 +495,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 .dokki-panel.is-open { transform: translateX(0); }
 .dokki-panel-inner {
-  padding: 28px 28px 60px;
+  padding: 56px 32px 64px;
   position: relative;
 }
 .dokki-panel-close {
@@ -404,14 +514,14 @@ html.dokki-no-splash #dokki-splash { display: none; }
 /* head: cover + title */
 .dokki-panel-head {
   display: flex;
-  gap: 16px;
+  gap: 26px;
   align-items: flex-start;
-  margin-bottom: 14px;
-  padding-right: 36px;
+  margin-bottom: 24px;
+  padding-right: 40px;
 }
 .dokki-panel-cover {
-  width: 64px;
-  height: 92px;
+  width: 72px;
+  height: 104px;
   flex-shrink: 0;
   object-fit: cover;
   border-radius: 3px;
@@ -423,17 +533,18 @@ html.dokki-no-splash #dokki-splash { display: none; }
 .dokki-panel-title-wrap {
   min-width: 0;
   flex: 1;
+  padding-top: 4px;
 }
 .dokki-panel-libinfo {
-  margin-top: 4px;
+  margin-top: 10px;
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   letter-spacing: -0.01em;
 }
 .dokki-panel-libactions {
   display: flex;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 14px;
 }
 .dokki-libaction,
 .dokki-libsearch-btn {
@@ -469,13 +580,13 @@ html.dokki-no-splash #dokki-splash { display: none; }
 .dokki-panel-meta {
   color: var(--text-muted);
   font-size: 0.85rem;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 .dokki-panel-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 8px;
-  margin-bottom: 32px;
+  margin-bottom: 36px;
 }
 .dokki-tag {
   font-size: 0.75rem;
@@ -548,26 +659,18 @@ html.dokki-no-splash #dokki-splash { display: none; }
 
 @media (max-width: 768px) {
   .dokki-controls {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    align-items: stretch;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "search filter"
+      "basis basis";
+    gap: 10px;
+    align-items: center;
   }
-  .dokki-basis {
-    justify-content: center;
-  }
-  .dokki-basis button {
-    flex: 1;
-  }
-  .dokki-filters {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-  }
-  .dokki-select {
-    padding-left: 8px;
-    padding-right: 24px;
-    background-position: right 6px center;
-  }
+  .dokki-search { grid-area: search; }
+  .dokki-filter-root { grid-area: filter; }
+  .dokki-basis { grid-area: basis; justify-content: center; }
+  .dokki-basis button { flex: 1; }
+  .dokki-filter-popover { right: 0; }
   .dokki-spine-inner {
     grid-template-columns: minmax(0, 1fr) auto;
   }
@@ -579,9 +682,6 @@ html.dokki-no-splash #dokki-splash { display: none; }
 @media (max-width: 640px) {
   .dokki-root { padding: 20px 18px 60px; }
   .dokki-quote { font-size: 1.15rem; }
-  .dokki-filters {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* === Library search overlay === */

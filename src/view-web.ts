@@ -3,7 +3,7 @@ import { renderGraph } from "./graphView";
 import { renderBookStack } from "./bookStack";
 import { tagLeafOf } from "./parser-core";
 import { searchBooks, NlBookResult } from "./nl-api";
-import { getMetadata, setMetadata, clearMetadata, NoteMetadata } from "./note-metadata";
+import { getMetadata, setMetadata, clearMetadata } from "./note-metadata";
 
 export interface WebViewOptions {
   books: BookNote[];
@@ -13,9 +13,9 @@ export interface WebViewOptions {
 export function mountWebView({ books, mount }: WebViewOptions): void {
   const state = {
     basis: "author" as GraphLinkBasis,
-    filterAuthor: null as string | null,
-    filterTag: null as string | null,
-    filterStatus: null as string | null,
+    filterAuthors: new Set<string>(),
+    filterTags: new Set<string>(),
+    filterStatuses: new Set<string>(),
     search: "",
   };
   let graphCleanup: (() => void) | null = null;
@@ -401,11 +401,18 @@ function renderExcerpt(
 
 interface ControlsState {
   basis: GraphLinkBasis;
-  filterAuthor: string | null;
-  filterTag: string | null;
-  filterStatus: string | null;
+  filterAuthors: Set<string>;
+  filterTags: Set<string>;
+  filterStatuses: Set<string>;
   search: string;
 }
+
+const STATUS_OPTIONS: Array<[string, string]> = [
+  ["reading", "읽는 중"],
+  ["stopped", "중단"],
+  ["finished", "완독"],
+  ["unknown", "기타"],
+];
 
 function renderControls(
   state: ControlsState,
@@ -448,60 +455,159 @@ function renderControls(
   basisWrap.append(btnA, btnT);
   bar.appendChild(basisWrap);
 
-  const filters = document.createElement("div");
-  filters.className = "dokki-filters";
-
-  const statusSel = makeSelect([
-    ["", "상태 전체"],
-    ["reading", "읽는 중"],
-    ["stopped", "중단"],
-    ["finished", "완독"],
-    ["unknown", "기타"],
-  ]);
-  statusSel.addEventListener("change", () => {
-    state.filterStatus = statusSel.value || null;
-    hooks.onSearchOrFilter();
-  });
-  filters.appendChild(statusSel);
-
-  const authors = uniqueSorted(books.map((b) => b.frontmatter.author ?? "").filter(Boolean));
-  const authorSel = makeSelect([["", "저자 전체"], ...authors.map((a) => [a, a] as [string, string])]);
-  authorSel.addEventListener("change", () => {
-    state.filterAuthor = authorSel.value || null;
-    hooks.onSearchOrFilter();
-  });
-  filters.appendChild(authorSel);
-
-  const tagLeaves = uniqueSorted(books.flatMap((b) => b.frontmatter.tags.map((t) => tagLeafOf(t))));
-  const tagSel = makeSelect([["", "태그 전체"], ...tagLeaves.map((t) => [t, t] as [string, string])]);
-  tagSel.addEventListener("change", () => {
-    state.filterTag = tagSel.value || null;
-    hooks.onSearchOrFilter();
-  });
-  filters.appendChild(tagSel);
-
-  bar.appendChild(filters);
+  bar.appendChild(renderFilterButton(state, books, hooks));
   return bar;
 }
 
-function makeSelect(options: [string, string][]): HTMLSelectElement {
-  const sel = document.createElement("select");
-  sel.className = "dokki-select";
-  for (const [v, label] of options) {
-    const o = document.createElement("option");
-    o.value = v;
-    o.textContent = label;
-    sel.appendChild(o);
+function renderFilterButton(
+  state: ControlsState,
+  books: BookNote[],
+  hooks: { onSearchOrFilter: () => void; onBasisChange: () => void },
+): HTMLElement {
+  const root = document.createElement("div");
+  root.className = "dokki-filter-root";
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "dokki-filter-btn";
+  const icon = document.createElement("span");
+  icon.className = "dokki-filter-icon";
+  icon.textContent = "≡";
+  const label = document.createElement("span");
+  label.textContent = "필터";
+  const badge = document.createElement("span");
+  badge.className = "dokki-filter-badge";
+  btn.append(icon, label, badge);
+  root.appendChild(btn);
+
+  const popover = document.createElement("div");
+  popover.className = "dokki-filter-popover";
+  root.appendChild(popover);
+
+  const activeCount = () =>
+    state.filterStatuses.size + state.filterAuthors.size + state.filterTags.size;
+
+  const refreshBadge = () => {
+    const n = activeCount();
+    badge.textContent = String(n);
+    btn.classList.toggle("is-active", n > 0);
+  };
+
+  const onChipChange = () => {
+    refreshBadge();
+    hooks.onSearchOrFilter();
+  };
+
+  const buildPopover = () => {
+    popover.innerHTML = "";
+    const head = document.createElement("div");
+    head.className = "dokki-filter-popover-head";
+    const title = document.createElement("span");
+    title.textContent = "필터";
+    head.appendChild(title);
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "dokki-filter-clear";
+    clear.textContent = "초기화";
+    clear.addEventListener("click", () => {
+      state.filterStatuses.clear();
+      state.filterAuthors.clear();
+      state.filterTags.clear();
+      buildPopover();
+      refreshBadge();
+      hooks.onSearchOrFilter();
+    });
+    head.appendChild(clear);
+    popover.appendChild(head);
+
+    const authors = uniqueSorted(books.map((b) => b.frontmatter.author ?? "").filter(Boolean));
+    const tagLeaves = uniqueSorted(
+      books.flatMap((b) => b.frontmatter.tags.map((t) => tagLeafOf(t))),
+    );
+
+    popover.appendChild(buildFilterSection("상태", STATUS_OPTIONS, state.filterStatuses, onChipChange));
+    popover.appendChild(
+      buildFilterSection(
+        "저자",
+        authors.map((a) => [a, a] as [string, string]),
+        state.filterAuthors,
+        onChipChange,
+      ),
+    );
+    popover.appendChild(
+      buildFilterSection(
+        "태그",
+        tagLeaves.map((t) => [t, t] as [string, string]),
+        state.filterTags,
+        onChipChange,
+      ),
+    );
+  };
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const open = popover.classList.toggle("is-open");
+    if (open) buildPopover();
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!root.contains(e.target as Node)) popover.classList.remove("is-open");
+  });
+
+  refreshBadge();
+  return root;
+}
+
+function buildFilterSection(
+  label: string,
+  options: Array<[string, string]>,
+  set: Set<string>,
+  onChange: () => void,
+): HTMLElement {
+  const section = document.createElement("div");
+  section.className = "dokki-filter-section";
+  const heading = document.createElement("div");
+  heading.className = "dokki-filter-section-label";
+  heading.textContent = label;
+  section.appendChild(heading);
+  const list = document.createElement("div");
+  list.className = "dokki-filter-section-list";
+  if (options.length === 0) {
+    const empty = document.createElement("span");
+    empty.className = "dokki-filter-empty";
+    empty.textContent = "없음";
+    list.appendChild(empty);
+  } else {
+    for (const [val, text] of options) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "dokki-filter-chip";
+      if (set.has(val)) chip.classList.add("is-active");
+      chip.textContent = text;
+      chip.addEventListener("click", () => {
+        if (set.has(val)) set.delete(val);
+        else set.add(val);
+        chip.classList.toggle("is-active");
+        onChange();
+      });
+      list.appendChild(chip);
+    }
   }
-  return sel;
+  section.appendChild(list);
+  return section;
 }
 
 function filtered(state: ControlsState, books: BookNote[]): BookNote[] {
   const q = state.search.trim().toLowerCase();
   return books.filter((b) => {
-    if (state.filterAuthor && b.frontmatter.author !== state.filterAuthor) return false;
-    if (state.filterTag && !b.frontmatter.tags.some((t) => tagLeafOf(t) === state.filterTag)) return false;
-    if (state.filterStatus && b.status !== state.filterStatus) return false;
+    if (state.filterStatuses.size > 0 && !state.filterStatuses.has(b.status)) return false;
+    if (state.filterAuthors.size > 0 && !state.filterAuthors.has(b.frontmatter.author ?? "")) return false;
+    if (
+      state.filterTags.size > 0 &&
+      !b.frontmatter.tags.some((t) => state.filterTags.has(tagLeafOf(t)))
+    ) {
+      return false;
+    }
     if (!q) return true;
     if (b.title.toLowerCase().includes(q)) return true;
     if ((b.frontmatter.author ?? "").toLowerCase().includes(q)) return true;
