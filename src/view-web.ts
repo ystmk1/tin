@@ -1,7 +1,7 @@
-import { BookNote, BoldFragment, GraphLinkBasis } from "../../src/types";
-import { renderGraph } from "../../src/graphView";
-import { renderBookStack } from "../../src/bookStack";
-import { tagLeafOf } from "../../src/parser-core";
+import { BookNote, GraphLinkBasis } from "./types";
+import { renderGraph } from "./graphView";
+import { renderBookStack } from "./bookStack";
+import { tagLeafOf } from "./parser-core";
 
 export interface WebViewOptions {
   books: BookNote[];

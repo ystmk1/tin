@@ -1,8 +1,8 @@
 import { TFile, App, parseYaml } from "obsidian";
-import { BookNote } from "./types";
-import { parseBookContent } from "./parser-core";
+import { BookNote } from "../../src/types";
+import { parseBookContent } from "../../src/parser-core";
 
-export { tagLeafOf } from "./parser-core";
+export { tagLeafOf } from "../../src/parser-core";
 
 export async function parseAllBooks(app: App, folder?: string): Promise<BookNote[]> {
   const files = app.vault.getMarkdownFiles().filter((f) => {

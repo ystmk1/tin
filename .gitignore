@@ -1,5 +1,6 @@
 # dependencies
 node_modules/
+plugin/node_modules/
 
 # editor / OS
 .DS_Store
@@ -12,24 +13,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# build artifacts inside the test vault (the real build at repo root is committed)
-test-vault/.obsidian/plugins/dokki/
-
-# obsidian user/workspace state inside test-vault
-test-vault/.obsidian/workspace*.json
-test-vault/.obsidian/cache
-test-vault/.obsidian/hotkeys.json
-test-vault/.obsidian/appearance.json
-test-vault/.obsidian/graph.json
-test-vault/.obsidian/core-plugins.json
+# build artifacts
+dist/
+.vercel/
+*.js.map
 
 # Claude Code agent state
 .claude/
-
-# sourcemaps for dev builds
-*.js.map
-
-# web build artifacts
-web/node_modules/
-web/dist/
-.vercel/

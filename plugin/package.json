@@ -1,0 +1,32 @@
+{
+  "name": "dokki",
+  "version": "0.1.0",
+  "description": "Obsidian plugin: 독서 발췌 노트 탐색기",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production",
+    "deploy": "node scripts/deploy.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/d3-force": "^3.0.10",
+    "@types/d3-selection": "^3.0.10",
+    "@types/d3-drag": "^3.0.7",
+    "@types/d3-zoom": "^3.0.8",
+    "@types/node": "^20.11.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.0",
+    "obsidian": "latest",
+    "tslib": "^2.6.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "d3-force": "^3.0.0",
+    "d3-selection": "^3.0.0",
+    "d3-drag": "^3.0.0",
+    "d3-zoom": "^3.0.0"
+  }
+}

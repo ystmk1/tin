@@ -1,9 +1,9 @@
 import { load as yamlLoad } from "js-yaml";
-import { BookNote } from "../../src/types";
-import { parseBookContent } from "../../src/parser-core";
+import { BookNote } from "./types";
+import { parseBookContent } from "./parser-core";
 
-// Vite bundles every md in test-vault/notes/ as raw string at build time.
-const modules = import.meta.glob("../../test-vault/notes/*.md", {
+// Vite bundles every md in notes/ as raw string at build time.
+const modules = import.meta.glob("../notes/*.md", {
   query: "?raw",
   import: "default",
   eager: true,

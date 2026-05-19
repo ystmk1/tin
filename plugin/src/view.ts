@@ -1,8 +1,8 @@
 import { ItemView, WorkspaceLeaf, TFile, Notice } from "obsidian";
-import { BookNote, BoldFragment, GraphLinkBasis } from "./types";
+import { BookNote, BoldFragment, GraphLinkBasis } from "../../src/types";
 import { parseAllBooks } from "./parser";
-import { renderGraph } from "./graphView";
-import { renderBookStack } from "./bookStack";
+import { renderGraph } from "../../src/graphView";
+import { renderBookStack } from "../../src/bookStack";
 
 export const VIEW_TYPE_DOKKI = "dokki-explorer";
 
