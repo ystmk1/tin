@@ -20,10 +20,14 @@ export function renderBookStack(
     const inner = row.createDiv({ cls: "dokki-spine-inner" });
     inner.createDiv({ cls: "dokki-spine-title", text: b.title });
     const meta = inner.createDiv({ cls: "dokki-spine-meta" });
-    if (b.frontmatter.author) meta.createSpan({ text: b.frontmatter.author });
+    if (b.frontmatter.author) {
+      meta.createSpan({ cls: "dokki-spine-author", text: b.frontmatter.author });
+    }
     if (b.frontmatter.publisher) {
-      meta.createSpan({ cls: "dokki-spine-sep", text: " · " });
-      meta.createSpan({ text: b.frontmatter.publisher });
+      if (b.frontmatter.author) {
+        meta.createSpan({ cls: "dokki-spine-sep", text: " · " });
+      }
+      meta.createSpan({ cls: "dokki-spine-publisher", text: b.frontmatter.publisher });
     }
     const status = inner.createDiv({ cls: "dokki-spine-status" });
     status.setText(statusLabel(b));

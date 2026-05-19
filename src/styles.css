@@ -681,17 +681,32 @@ html.dokki-no-splash #dokki-splash { display: none; }
 .dokki-panel-backdrop.is-open { opacity: 1; pointer-events: auto; }
 
 @media (max-width: 768px) {
-  .dokki-controls {
-    grid-template-columns: 1fr auto;
-    gap: 10px;
-    align-items: center;
+  /* Mobile: keep just the random excerpt + the book stack.
+     Hide everything secondary so the page reads like a single column. */
+  .dokki-repo-link,
+  .dokki-controls,
+  .dokki-graph-wrap {
+    display: none;
   }
-  .dokki-filter-popover { right: 0; }
-  .dokki-spine-inner {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
+
+  /* Spine row: title left, author right. Status chip and publisher hidden;
+     the colored left border still indicates reading status. */
+  .dokki-spine-status { display: none; }
   .dokki-spine-meta {
-    display: none; /* Hide meta on mobile to prevent overlap */
+    display: inline-block;
+    margin-left: auto;
+    text-align: right;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Hide separator + publisher; only the author span remains. */
+  .dokki-spine-sep,
+  .dokki-spine-publisher {
+    display: none;
   }
 }
 
