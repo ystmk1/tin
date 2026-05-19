@@ -113,7 +113,6 @@ html.dokki-no-splash #dokki-splash { display: none; }
   text-decoration: none;
   color: var(--text-normal);
 }
-.dokki-brand img { display: block; border-radius: 6px; }
 .dokki-brand span {
   font-family: var(--font-display);
   font-weight: 700;

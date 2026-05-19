@@ -28,12 +28,6 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
   const brand = document.createElement("a");
   brand.className = "dokki-brand";
   brand.href = "/";
-  const brandImg = document.createElement("img");
-  brandImg.src = "/android-chrome-192x192.png";
-  brandImg.alt = "DoKKi";
-  brandImg.width = 28;
-  brandImg.height = 28;
-  brand.appendChild(brandImg);
   const brandName = document.createElement("span");
   brandName.textContent = "도끼";
   brand.appendChild(brandName);
