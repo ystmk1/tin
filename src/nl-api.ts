@@ -25,7 +25,13 @@ export async function searchBooks(query: string, signal?: AbortSignal): Promise<
   const res = await fetch(url, { signal });
   const text = await res.text();
   const contentType = res.headers.get("content-type") ?? "";
-  let body: { error?: string; total?: number; results?: NlBookResult[]; warnings?: string[] } | null = null;
+  let body: {
+    error?: string;
+    stack?: string;
+    total?: number;
+    results?: NlBookResult[];
+    warnings?: string[];
+  } | null = null;
   try {
     body = text ? JSON.parse(text) : null;
   } catch {
@@ -41,7 +47,8 @@ export async function searchBooks(query: string, signal?: AbortSignal): Promise<
     );
   }
   if (!res.ok) {
-    const errMsg = typeof body?.error === "string" ? body.error : `HTTP ${res.status}`;
+    let errMsg = typeof body?.error === "string" ? body.error : `HTTP ${res.status}`;
+    if (body?.stack) errMsg += ` — ${body.stack}`;
     throw new Error(errMsg);
   }
   return body as NlSearchResponse;
