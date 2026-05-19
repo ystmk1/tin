@@ -9,7 +9,9 @@
   --text-muted: #6b6b66;
   --text-faint: #999692;
   --interactive-accent: #5a6b4a;
-  --font-text: ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
+  --font-display: "Pretendard Variable", "Pretendard", -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font-text: "Pretendard Variable", "Pretendard", -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font-ui: "Pretendard Variable", "Pretendard", ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -30,6 +32,7 @@ html, body {
   color: var(--text-normal);
   font-family: var(--font-text);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #app { min-height: 100vh; }
@@ -60,7 +63,12 @@ html, body {
   color: var(--text-normal);
 }
 .dokki-brand img { display: block; border-radius: 6px; }
-.dokki-brand span { font-weight: 600; letter-spacing: -0.01em; }
+.dokki-brand span {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
 .dokki-repo-link {
   color: var(--text-muted);
   text-decoration: none;
@@ -76,15 +84,16 @@ html, body {
   margin-bottom: 14px;
 }
 .dokki-quote {
-  font-size: 1.35rem;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
   line-height: 1.55;
-  font-weight: 400;
-  margin: 0 0 8px;
+  font-weight: 500;
+  margin: 0 0 10px;
   padding: 0;
   border: none;
   color: var(--text-normal);
   font-style: normal;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.02em;
 }
 .dokki-quote::before { content: "“"; opacity: 0.4; margin-right: 2px; }
 .dokki-quote::after  { content: "”"; opacity: 0.4; margin-left: 2px; }
@@ -125,6 +134,7 @@ html, body {
   align-items: center;
   padding: 6px 0 14px;
   font-size: 0.82rem;
+  font-family: var(--font-ui);
 }
 .dokki-search {
   flex: 1 1 220px;
@@ -229,13 +239,16 @@ html, body {
   min-width: 0;
 }
 .dokki-spine-title {
+  font-family: var(--font-display);
   font-weight: 500;
+  font-size: 0.92rem;
   color: var(--text-normal);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 0 1 auto;
   max-width: 50%;
+  letter-spacing: -0.015em;
 }
 .dokki-spine-meta {
   color: var(--text-muted);
@@ -287,9 +300,11 @@ html, body {
 }
 .dokki-panel-close:hover { color: var(--text-normal); }
 .dokki-panel-inner h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
   margin: 0 0 6px;
-  font-size: 1.4rem;
-  letter-spacing: -0.01em;
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
 }
 .dokki-panel-meta {
   color: var(--text-muted);
@@ -337,9 +352,9 @@ html, body {
 .dokki-panel-body {
   margin: 0;
   white-space: pre-wrap;
-  font-family: inherit;
-  font-size: 0.95rem;
-  line-height: 1.65;
+  font-family: var(--font-text);
+  font-size: 0.98rem;
+  line-height: 1.75;
   color: var(--text-normal);
 }
 .dokki-panel-body strong {

@@ -20,3 +20,6 @@ dist/
 
 # Claude Code agent state
 .claude/
+
+# private font assets (licensed; deploy via Vercel CLI, never push)
+public/fonts/
