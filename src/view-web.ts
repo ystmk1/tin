@@ -541,5 +541,11 @@ function renderBodyHTML(body: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
-  return escaped.replace(BOLD_HTML, "<strong>$1</strong>");
+  // 3+ consecutive newlines (=2+ blank lines) represent an intentional skip
+  // (middle of page skipped, or stitched-together continuous pages). Render
+  // as a single normalized gap regardless of how many enters were typed.
+  // A single blank line (\n\n, =book paragraph break) is preserved as-is
+  // by the surrounding white-space: pre-wrap.
+  const withSkips = escaped.replace(/\n{3,}/g, '<span class="dokki-skip" aria-hidden="true"></span>');
+  return withSkips.replace(BOLD_HTML, "<strong>$1</strong>");
 }

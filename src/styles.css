@@ -452,8 +452,16 @@ html, body {
 }
 .dokki-panel-pages {
   margin-top: 72px;
+  /* `--dokki-gap` controls both inter-page spacing AND the normalized
+     skip gap inside a single page body. They are intentionally the same. */
+  --dokki-gap: 56px;
 }
-.dokki-panel-pages section { margin-bottom: 26px; }
+.dokki-panel-pages section { margin-bottom: var(--dokki-gap); }
+.dokki-panel-pages section:last-child { margin-bottom: 0; }
+.dokki-skip {
+  display: block;
+  height: var(--dokki-gap);
+}
 .dokki-panel-pages h3 {
   margin: 0 0 6px;
   font-size: 0.78rem;
