@@ -193,7 +193,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
 /* === CONTROLS === */
 .dokki-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
   padding: 12px 0 24px;
@@ -213,36 +213,6 @@ html.dokki-no-splash #dokki-splash { display: none; }
   letter-spacing: -0.01em;
 }
 .dokki-search:focus { border-bottom-color: var(--text-normal); }
-
-.dokki-basis { 
-  display: flex; 
-  gap: 6px; 
-  align-items: center; 
-  color: var(--text-muted); 
-  background: var(--background-secondary);
-  padding: 4px;
-  border-radius: 8px;
-}
-.dokki-basis span {
-  display: none;
-}
-.dokki-basis button {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  padding: 6px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  transition: all 0.2s;
-}
-.dokki-basis button.is-active {
-  background: var(--background-primary);
-  color: var(--text-normal);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
 
 /* === Filter button + popover === */
 .dokki-filter-root {
@@ -571,8 +541,8 @@ html.dokki-no-splash #dokki-splash { display: none; }
 
 .dokki-panel-title-row {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
   flex-wrap: wrap;
 }
 .dokki-panel-inner h2 {
@@ -584,12 +554,26 @@ html.dokki-no-splash #dokki-splash { display: none; }
   line-height: 1.2;
 }
 .dokki-rating {
-  font-size: 0.9rem;
-  letter-spacing: 0.06em;
-  color: hsl(38, 80%, 55%);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-normal);
   user-select: none;
   white-space: nowrap;
+  /* keep stars aligned to the title's optical center */
+  line-height: 0;
 }
+.dokki-star {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  display: block;
+}
+.dokki-star.is-filled { fill: currentColor; }
 .dokki-panel-meta {
   color: var(--text-muted);
   font-size: 0.85rem;
@@ -673,16 +657,9 @@ html.dokki-no-splash #dokki-splash { display: none; }
 @media (max-width: 768px) {
   .dokki-controls {
     grid-template-columns: 1fr auto;
-    grid-template-areas:
-      "search filter"
-      "basis basis";
     gap: 10px;
     align-items: center;
   }
-  .dokki-search { grid-area: search; }
-  .dokki-filter-root { grid-area: filter; }
-  .dokki-basis { grid-area: basis; justify-content: center; }
-  .dokki-basis button { flex: 1; }
   .dokki-filter-popover { right: 0; }
   .dokki-spine-inner {
     grid-template-columns: minmax(0, 1fr) auto;

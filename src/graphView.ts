@@ -13,7 +13,7 @@ import {
 import { select } from "d3-selection";
 import { drag } from "d3-drag";
 import { zoom, ZoomTransform, zoomIdentity } from "d3-zoom";
-import { BookNote, GraphLinkBasis } from "./types";
+import { BookNote } from "./types";
 import { buildGraph } from "./graph";
 
 interface SimNode extends SimulationNodeDatum {
@@ -28,13 +28,24 @@ interface SimLink extends SimulationLinkDatum<SimNode> {
   target: string | SimNode;
 }
 
+export interface GraphHandle {
+  /** Tear down d3 simulation and SVG. */
+  cleanup: () => void;
+  /**
+   * Dim every node not in `highlightIds` to ~15% opacity, plus any link
+   * that touches a dimmed node. Pass `null` to clear (restore full
+   * opacity for everything). Layout is preserved across highlight
+   * changes — Obsidian-style.
+   */
+  setHighlight: (highlightIds: Set<string> | null) => void;
+}
+
 export function renderGraph(
   container: HTMLElement,
   books: BookNote[],
-  basis: GraphLinkBasis,
   onOpen: (path: string) => void,
-): () => void {
-  const { nodes: rawNodes, links: rawLinks } = buildGraph(books, basis);
+): GraphHandle {
+  const { nodes: rawNodes, links: rawLinks } = buildGraph(books);
 
   const width = container.clientWidth || 800;
   const height = 260;
@@ -58,7 +69,6 @@ export function renderGraph(
     return 0.4 + 1.4 * (avg / maxDeg);
   };
 
-  // Place high-degree nodes toward center (horizontal trunk), low-degree drift outward.
   const cx = width / 2;
   const cy = height / 2;
 
@@ -162,9 +172,32 @@ export function renderGraph(
   });
   ro.observe(container);
 
-  return () => {
-    sim.stop();
-    ro.disconnect();
-    svg.remove();
+  const DIM_NODE = 0.12;
+  const DIM_LINK = 0.06;
+  const DIM_LABEL = 0.15;
+
+  const setHighlight = (highlightIds: Set<string> | null): void => {
+    if (!highlightIds || highlightIds.size === 0) {
+      nodeSel.attr("opacity", 1);
+      linkSel.attr("stroke-opacity", 0.55);
+      labelSel.attr("opacity", 1);
+      return;
+    }
+    nodeSel.attr("opacity", (d) => (highlightIds.has(d.id) ? 1 : DIM_NODE));
+    labelSel.attr("opacity", (d) => (highlightIds.has(d.id) ? 1 : DIM_LABEL));
+    linkSel.attr("stroke-opacity", (d) => {
+      const sId = typeof d.source === "string" ? d.source : d.source.id;
+      const tId = typeof d.target === "string" ? d.target : d.target.id;
+      return highlightIds.has(sId) && highlightIds.has(tId) ? 0.55 : DIM_LINK;
+    });
+  };
+
+  return {
+    cleanup: () => {
+      sim.stop();
+      ro.disconnect();
+      svg.remove();
+    },
+    setHighlight,
   };
 }

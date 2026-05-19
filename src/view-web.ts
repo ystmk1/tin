@@ -1,5 +1,5 @@
-import { BookNote, GraphLinkBasis } from "./types";
-import { renderGraph } from "./graphView";
+import { BookNote } from "./types";
+import { renderGraph, type GraphHandle } from "./graphView";
 import { renderBookStack } from "./bookStack";
 import { tagLeafOf } from "./parser-core";
 import { searchBooks, NlBookResult } from "./nl-api";
@@ -12,13 +12,12 @@ export interface WebViewOptions {
 
 export function mountWebView({ books, mount }: WebViewOptions): void {
   const state = {
-    basis: "author" as GraphLinkBasis,
     filterAuthors: new Set<string>(),
     filterTags: new Set<string>(),
     filterStatuses: new Set<string>(),
     search: "",
   };
-  let graphCleanup: (() => void) | null = null;
+  let graph: GraphHandle | null = null;
 
   mount.classList.add("dokki-root");
   mount.innerHTML = "";
@@ -47,8 +46,10 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
   renderExcerpt(excerptWrap, books, (b) => openNote(b));
 
   const controls = renderControls(state, books, {
-    onSearchOrFilter: () => renderStack(),
-    onBasisChange: () => renderGraphSection(),
+    onSearchOrFilter: () => {
+      renderStack();
+      updateGraphHighlight();
+    },
   });
   mount.appendChild(controls);
 
@@ -155,10 +156,7 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
     title.textContent = b.title;
     titleRow.appendChild(title);
     if (b.frontmatter.rating !== undefined && b.frontmatter.rating > 0) {
-      const stars = document.createElement("span");
-      stars.className = "dokki-rating";
-      stars.title = `${b.frontmatter.rating} / 5`;
-      stars.textContent = renderStars(b.frontmatter.rating);
+      const stars = renderRatingEl(b.frontmatter.rating);
       titleRow.appendChild(stars);
     }
     titleWrap.appendChild(titleRow);
@@ -345,12 +343,23 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
   }
 
   function renderGraphSection() {
-    graphCleanup?.();
+    graph?.cleanup();
     graphWrap.innerHTML = "";
-    graphCleanup = renderGraph(graphWrap, books, state.basis, (path) => {
+    graph = renderGraph(graphWrap, books, (path) => {
       const b = books.find((x) => x.filePath === path);
       if (b) openNote(b);
     });
+    updateGraphHighlight();
+  }
+
+  function updateGraphHighlight() {
+    if (!graph) return;
+    if (!hasActiveFilter(state)) {
+      graph.setHighlight(null);
+      return;
+    }
+    const ids = new Set(filtered(state, books).map((b) => b.filePath));
+    graph.setHighlight(ids);
   }
 
   function renderStack() {
@@ -363,6 +372,15 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
 
   renderGraphSection();
   renderStack();
+}
+
+function hasActiveFilter(state: ControlsState): boolean {
+  return (
+    state.search.trim().length > 0 ||
+    state.filterAuthors.size > 0 ||
+    state.filterTags.size > 0 ||
+    state.filterStatuses.size > 0
+  );
 }
 
 function renderExcerpt(
@@ -410,11 +428,14 @@ function renderExcerpt(
 }
 
 interface ControlsState {
-  basis: GraphLinkBasis;
   filterAuthors: Set<string>;
   filterTags: Set<string>;
   filterStatuses: Set<string>;
   search: string;
+}
+
+interface ControlsHooks {
+  onSearchOrFilter: () => void;
 }
 
 const STATUS_OPTIONS: Array<[string, string]> = [
@@ -427,7 +448,7 @@ const STATUS_OPTIONS: Array<[string, string]> = [
 function renderControls(
   state: ControlsState,
   books: BookNote[],
-  hooks: { onSearchOrFilter: () => void; onBasisChange: () => void },
+  hooks: ControlsHooks,
 ): HTMLElement {
   const bar = document.createElement("div");
   bar.className = "dokki-controls";
@@ -442,29 +463,6 @@ function renderControls(
   });
   bar.appendChild(search);
 
-  const basisWrap = document.createElement("div");
-  basisWrap.className = "dokki-basis";
-  basisWrap.append(spanOf("연결: "));
-  const btnA = document.createElement("button");
-  btnA.textContent = "저자";
-  btnA.className = "is-active";
-  const btnT = document.createElement("button");
-  btnT.textContent = "태그";
-  btnA.addEventListener("click", () => {
-    state.basis = "author";
-    btnA.classList.add("is-active");
-    btnT.classList.remove("is-active");
-    hooks.onBasisChange();
-  });
-  btnT.addEventListener("click", () => {
-    state.basis = "tag-leaf";
-    btnT.classList.add("is-active");
-    btnA.classList.remove("is-active");
-    hooks.onBasisChange();
-  });
-  basisWrap.append(btnA, btnT);
-  bar.appendChild(basisWrap);
-
   bar.appendChild(renderFilterButton(state, books, hooks));
   return bar;
 }
@@ -472,7 +470,7 @@ function renderControls(
 function renderFilterButton(
   state: ControlsState,
   books: BookNote[],
-  hooks: { onSearchOrFilter: () => void; onBasisChange: () => void },
+  hooks: ControlsHooks,
 ): HTMLElement {
   const root = document.createElement("div");
   root.className = "dokki-filter-root";
@@ -645,9 +643,28 @@ function spanOf(text: string): HTMLElement {
   return s;
 }
 
-function renderStars(rating: number): string {
-  const r = Math.max(0, Math.min(5, Math.floor(rating)));
-  return "★".repeat(r) + "☆".repeat(5 - r);
+// Rounded star SVG path (chunky body, soft tips).
+const STAR_PATH =
+  "M12 3.4l2.62 5.31 5.86.85-4.24 4.13 1 5.84L12 16.78l-5.24 2.75 1-5.84L3.52 9.56l5.86-.85L12 3.4z";
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function renderRatingEl(rating: number): HTMLElement {
+  const r = Math.max(0, Math.min(5, Math.round(rating)));
+  const wrap = document.createElement("span");
+  wrap.className = "dokki-rating";
+  wrap.title = `${r} / 5`;
+  wrap.setAttribute("aria-label", `별점 ${r}점 만점 5점`);
+  for (let i = 0; i < 5; i++) {
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("class", i < r ? "dokki-star is-filled" : "dokki-star");
+    svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", STAR_PATH);
+    svg.appendChild(path);
+    wrap.appendChild(svg);
+  }
+  return wrap;
 }
 
 const BOLD_HTML = /\*\*([^*\n]+?)\*\*/g;
