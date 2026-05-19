@@ -1,5 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { searchNlBooks } from "../lib/nl-search";
+import { searchBooksCombined } from "../lib/book-search";
+
+// Endpoint name kept as /api/nl-search for backwards compat with the
+// existing client. Internally it now runs NL Korea + Aladin in parallel
+// and returns a merged, deduped, junk-filtered list.
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const q = String(req.query.q ?? "").trim();
@@ -7,14 +11,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(400).json({ error: "missing q" });
     return;
   }
-  const key = process.env.NL_API_KEY;
-  if (!key) {
-    res.status(500).json({ error: "NL_API_KEY not configured on this deployment" });
+  const nlKey = process.env.NL_API_KEY;
+  const aladinKey = process.env.ALADIN_TTB_KEY;
+  if (!nlKey && !aladinKey) {
+    res.status(500).json({ error: "No NL_API_KEY or ALADIN_TTB_KEY configured" });
     return;
   }
   try {
-    const payload = await searchNlBooks(q, key);
-    // 1 day at the edge, 7 day SWR — same book search → same result, ok to cache hard.
+    const payload = await searchBooksCombined(q, { nlKey, aladinKey });
     res.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
     res.status(200).json(payload);
   } catch (e) {

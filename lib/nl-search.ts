@@ -6,22 +6,34 @@
 
 const NL_API_URL = "https://www.nl.go.kr/NL/search/openApi/search.do";
 
+export type BookSource = "nl" | "aladin";
+
 export interface NlBookResult {
-  controlNo: string;        // NL internal record id
+  source: BookSource;
+  controlNo: string;
   title: string;
   author?: string;
   publisher?: string;
   pubYear?: string;
-  isbn?: string;            // first 13-digit ISBN if multiple
-  typeName?: string;        // 자료유형
-  callNo?: string;          // 청구기호
-  detailLink?: string;      // detail page URL (relative to nl.go.kr)
-  coverUrl?: string;        // best-effort cover URL (Open Library by ISBN)
+  isbn?: string;
+  typeName?: string;
+  callNo?: string;
+  detailLink?: string;
+  coverUrl?: string;
 }
 
 export interface NlSearchResponse {
   total: number;
   results: NlBookResult[];
+}
+
+const UNKNOWN_RE = /^\s*(?:알\s*수\s*없음|unknown|미상|n\/a|-)\s*$/i;
+
+export function isJunkResult(r: NlBookResult): boolean {
+  if (!r.title || UNKNOWN_RE.test(r.title)) return true;
+  // tighten: no cover AND no author AND no isbn → drop
+  if (!r.coverUrl && !r.author && !r.isbn) return true;
+  return false;
 }
 
 export async function searchNlBooks(query: string, key: string): Promise<NlSearchResponse> {
@@ -96,8 +108,9 @@ function normalizeItem(item: Record<string, unknown>): NlBookResult {
   const controlNo = String(item.control_no ?? item.id ?? "");
   const detailLink = optional(item.detail_link);
   return {
+    source: "nl",
     controlNo,
-    title: title || "(제목 없음)",
+    title: title || "",
     author,
     publisher,
     pubYear,
@@ -105,7 +118,10 @@ function normalizeItem(item: Record<string, unknown>): NlBookResult {
     typeName: optional(item.type_name),
     callNo: optional(item.call_no),
     detailLink: detailLink ? absolutize(detailLink) : undefined,
-    coverUrl: isbn ? openLibraryCover(isbn) : undefined,
+    // NL Korea doesn't return cover URLs and Open Library has poor Korean coverage;
+    // we now rely on Aladin for covers. Leave undefined here so the merger can
+    // borrow Aladin's cover via ISBN dedup, or render the letter-placeholder.
+    coverUrl: undefined,
   };
 }
 
@@ -135,10 +151,6 @@ function pickIsbn(v: unknown): string | undefined {
     if (digits.length === 13 || digits.length === 10) return digits;
   }
   return undefined;
-}
-
-function openLibraryCover(isbn: string): string {
-  return `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-M.jpg?default=false`;
 }
 
 function absolutize(link: string): string {

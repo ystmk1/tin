@@ -1,7 +1,9 @@
 import { BookNote, BookFrontmatter, PageExcerpt, BoldFragment, ReadingStatus } from "./types";
 
-const PAGE_HEADER = /^#####\s+(\d+)\s*$/;
+// Page marker: "##### 24" or "##### 24p" or "##### 24p." or "##### 24쪽" etc.
+const PAGE_HEADER = /^#####\s+(\d+)\s*(?:p\.?|쪽|page)?\s*$/i;
 const BOLD_PATTERN = /\*\*([^*\n]+?)\*\*/g;
+const STAR_TAG = /^[★☆✦✧⭐]+$/;
 
 export type YamlParser = (raw: string) => Record<string, unknown> | null | undefined;
 
@@ -63,15 +65,28 @@ function normalizeFrontmatter(fm: Record<string, unknown>): BookFrontmatter {
     return undefined;
   };
   const tagsRaw = get("tags", "tag", "태그");
-  let tags: string[] = [];
+  let rawTags: string[] = [];
   if (Array.isArray(tagsRaw)) {
-    tags = tagsRaw.map((t) => String(t).trim()).filter(Boolean);
+    rawTags = tagsRaw.map((t) => String(t).trim()).filter(Boolean);
   } else if (typeof tagsRaw === "string") {
-    tags = tagsRaw
-      .split(/[,\s]+/)
-      .map((t) => t.replace(/^#/, "").trim())
-      .filter(Boolean);
+    rawTags = tagsRaw.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
   }
+  // Strip leading # (Obsidian inline-tag style) on every value
+  rawTags = rawTags.map((t) => t.replace(/^#+/, "").trim()).filter(Boolean);
+
+  // Pull star ratings out of tags. e.g. ☆☆☆☆ → rating 4
+  let rating: number | undefined;
+  const tags: string[] = [];
+  for (const t of rawTags) {
+    if (STAR_TAG.test(t)) {
+      const count = [...t].length; // unicode-aware codepoint count
+      if (rating === undefined || count > rating) rating = count;
+    } else {
+      tags.push(t);
+    }
+  }
+  if (rating !== undefined) rating = Math.max(0, Math.min(5, rating));
+
   const status = String(get("status", "현재 상태", "현재상태", "상태") ?? "").trim() || undefined;
   const stoppedAtPage = extractStoppedPage(status);
   return {
@@ -79,9 +94,10 @@ function normalizeFrontmatter(fm: Record<string, unknown>): BookFrontmatter {
     status,
     rawStatus: status,
     stoppedAtPage,
-    startDate: strOrUndef(get("start_date", "startDate", "시작일", "읽기 시작한 날짜", "읽기시작한날짜")),
-    endDate: strOrUndef(get("end_date", "endDate", "종료일", "다 읽은 날짜", "다읽은날짜", "완독일")),
+    startDate: strOrUndef(get("start_date", "startDate", "start", "시작일", "읽기 시작한 날짜", "읽기시작한날짜")),
+    endDate: strOrUndef(get("end_date", "endDate", "finish", "종료일", "다 읽은 날짜", "다읽은날짜", "완독일")),
     tags,
+    rating,
     publisher: strOrUndef(get("publisher", "출판사")),
     comment: strOrUndef(get("comment", "코멘트", "내가 작성한 코멘트")),
   };

@@ -569,6 +569,12 @@ html.dokki-no-splash #dokki-splash { display: none; }
   margin-top: 6px;
 }
 
+.dokki-panel-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 .dokki-panel-inner h2 {
   font-family: var(--font-display);
   font-weight: 600;
@@ -576,6 +582,13 @@ html.dokki-no-splash #dokki-splash { display: none; }
   font-size: 1.45rem;
   letter-spacing: -0.02em;
   line-height: 1.2;
+}
+.dokki-rating {
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  color: hsl(38, 80%, 55%);
+  user-select: none;
+  white-space: nowrap;
 }
 .dokki-panel-meta {
   color: var(--text-muted);

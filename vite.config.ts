@@ -1,9 +1,9 @@
 import { defineConfig, loadEnv, type Plugin } from "vite";
-import { searchNlBooks } from "./lib/nl-search";
+import { searchBooksCombined } from "./lib/book-search";
 
-function nlSearchDevPlugin(apiKey: string | undefined): Plugin {
+function bookSearchDevPlugin(nlKey: string | undefined, aladinKey: string | undefined): Plugin {
   return {
-    name: "nl-search-dev",
+    name: "dokki-book-search-dev",
     configureServer(server) {
       server.middlewares.use("/api/nl-search", async (req, res) => {
         const send = (status: number, body: unknown) => {
@@ -15,8 +15,12 @@ function nlSearchDevPlugin(apiKey: string | undefined): Plugin {
           const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
           const q = (url.searchParams.get("q") ?? "").trim();
           if (!q) return send(400, { error: "missing q" });
-          if (!apiKey) return send(500, { error: "NL_API_KEY not in .env.local" });
-          const payload = await searchNlBooks(q, apiKey);
+          if (!nlKey && !aladinKey) {
+            return send(500, {
+              error: "No NL_API_KEY or ALADIN_TTB_KEY in .env.local",
+            });
+          }
+          const payload = await searchBooksCombined(q, { nlKey, aladinKey });
           return send(200, payload);
         } catch (e) {
           return send(502, { error: e instanceof Error ? e.message : String(e) });
@@ -31,7 +35,7 @@ export default defineConfig(({ mode }) => {
   return {
     root: ".",
     publicDir: "public",
-    plugins: [nlSearchDevPlugin(env.NL_API_KEY)],
+    plugins: [bookSearchDevPlugin(env.NL_API_KEY, env.ALADIN_TTB_KEY)],
     build: {
       outDir: "dist",
       emptyOutDir: true,

@@ -8,6 +8,7 @@ export interface BookFrontmatter {
   startDate?: string;
   endDate?: string;
   tags: string[];
+  rating?: number; // 1..5, extracted from ☆/★ tags
   publisher?: string;
   comment?: string;
 }

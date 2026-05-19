@@ -51,11 +51,12 @@ npm run build     # → dist/
 
 ## 환경변수
 
-| 이름           | 용도                                              | 어디서                |
-| -------------- | ------------------------------------------------- | --------------------- |
-| `NL_API_KEY`   | 국립중앙도서관 openAPI 인증키 (서버에서만 사용)   | `.env.local`, Vercel  |
+| 이름              | 용도                                                | 어디서               |
+| ----------------- | --------------------------------------------------- | -------------------- |
+| `NL_API_KEY`      | 국립중앙도서관 openAPI 인증키 (서버 사용)           | `.env.local`, Vercel |
+| `ALADIN_TTB_KEY`  | 알라딘 TTB OpenAPI 키 (한국 책 표지·서지 제공)      | `.env.local`, Vercel |
 
-키는 클라이언트 번들에 들어가지 않습니다 — `api/nl-search.ts` (Vercel 서버리스) 또는 `vite.config.ts`의 dev middleware 안에서만 읽습니다. 따라서 브라우저 개발자도구로 키를 볼 수 없습니다.
+키는 클라이언트 번들에 들어가지 않습니다 — `api/nl-search.ts` (Vercel 서버리스) 또는 `vite.config.ts`의 dev middleware 안에서만 읽습니다. 따라서 브라우저 개발자도구로 키를 볼 수 없습니다. 두 키 중 하나만 있어도 검색은 동작합니다 (양쪽 다 있으면 결과를 병합·중복제거).
 
 ## 배포 (Vercel)
 
@@ -67,7 +68,7 @@ npm run build     # → dist/
 - **Install Command**: `npm install` (자동)
 - **Functions**: `api/*` 가 자동으로 Serverless로 빌드됨
 
-배포 전에 **Settings → Environment Variables** 에서 `NL_API_KEY` 추가 (Production/Preview/Development 모두 체크).
+배포 전에 **Settings → Environment Variables** 에서 `NL_API_KEY` + `ALADIN_TTB_KEY` 추가 (Production/Preview/Development 모두 체크).
 
 이전에 빌드가 실패했다면 **Settings → Build & Development Settings** 에서 모든 항목의 "Override"를 해제해 자동 감지에 맡기세요.
 

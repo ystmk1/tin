@@ -149,9 +149,19 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
 
     const titleWrap = document.createElement("div");
     titleWrap.className = "dokki-panel-title-wrap";
+    const titleRow = document.createElement("div");
+    titleRow.className = "dokki-panel-title-row";
     const title = document.createElement("h2");
     title.textContent = b.title;
-    titleWrap.appendChild(title);
+    titleRow.appendChild(title);
+    if (b.frontmatter.rating !== undefined && b.frontmatter.rating > 0) {
+      const stars = document.createElement("span");
+      stars.className = "dokki-rating";
+      stars.title = `${b.frontmatter.rating} / 5`;
+      stars.textContent = renderStars(b.frontmatter.rating);
+      titleRow.appendChild(stars);
+    }
+    titleWrap.appendChild(titleRow);
 
     if (meta) {
       const sub = document.createElement("div");
@@ -633,6 +643,11 @@ function spanOf(text: string): HTMLElement {
   const s = document.createElement("span");
   s.textContent = text;
   return s;
+}
+
+function renderStars(rating: number): string {
+  const r = Math.max(0, Math.min(5, Math.floor(rating)));
+  return "★".repeat(r) + "☆".repeat(5 - r);
 }
 
 const BOLD_HTML = /\*\*([^*\n]+?)\*\*/g;

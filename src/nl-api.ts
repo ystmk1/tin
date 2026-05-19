@@ -1,4 +1,7 @@
+export type BookSource = "nl" | "aladin";
+
 export interface NlBookResult {
+  source: BookSource;
   controlNo: string;
   title: string;
   author?: string;
@@ -14,6 +17,7 @@ export interface NlBookResult {
 export interface NlSearchResponse {
   total: number;
   results: NlBookResult[];
+  warnings?: string[];
 }
 
 export async function searchBooks(query: string, signal?: AbortSignal): Promise<NlSearchResponse> {
