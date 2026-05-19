@@ -1,5 +1,5 @@
 import { BookNote, GraphLink, GraphLinkBasis, GraphNode } from "./types";
-import { tagLeafOf } from "./parser";
+import { tagLeafOf } from "./parser-core";
 
 export function buildGraph(
   books: BookNote[],
