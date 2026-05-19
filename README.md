@@ -41,22 +41,35 @@
 
 ```powershell
 npm install
+# .env.local 만들기 (git에 안 들어감)
+"NL_API_KEY=발급받은_국립중앙도서관_API_키" | Out-File -Encoding ascii .env.local
 npm run dev       # http://localhost:5180
 npm run build     # → dist/
 ```
 
 `notes/` 의 `.md` 파일을 추가/수정하면 dev 서버가 HMR로 자동 갱신.
 
+## 환경변수
+
+| 이름           | 용도                                              | 어디서                |
+| -------------- | ------------------------------------------------- | --------------------- |
+| `NL_API_KEY`   | 국립중앙도서관 openAPI 인증키 (서버에서만 사용)   | `.env.local`, Vercel  |
+
+키는 클라이언트 번들에 들어가지 않습니다 — `api/nl-search.ts` (Vercel 서버리스) 또는 `vite.config.ts`의 dev middleware 안에서만 읽습니다. 따라서 브라우저 개발자도구로 키를 볼 수 없습니다.
+
 ## 배포 (Vercel)
 
-이 레포는 Vite 정적 사이트로 자동 인식됩니다. 별도 `vercel.json` 없이:
+이 레포는 Vite + Serverless functions 조합으로 자동 인식됩니다.
 
 - **Framework Preset**: Vite (자동 감지)
 - **Build Command**: `npm run build` (자동)
 - **Output Directory**: `dist` (자동)
 - **Install Command**: `npm install` (자동)
+- **Functions**: `api/*` 가 자동으로 Serverless로 빌드됨
 
-이전에 빌드가 실패했다면 Vercel 대시보드의 **Settings → Build & Development Settings**에서 모든 항목의 "Override"를 해제해 자동 감지에 맡기세요.
+배포 전에 **Settings → Environment Variables** 에서 `NL_API_KEY` 추가 (Production/Preview/Development 모두 체크).
+
+이전에 빌드가 실패했다면 **Settings → Build & Development Settings** 에서 모든 항목의 "Override"를 해제해 자동 감지에 맡기세요.
 
 ## 노트 양식
 

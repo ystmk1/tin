@@ -2,6 +2,8 @@ import { BookNote, GraphLinkBasis } from "./types";
 import { renderGraph } from "./graphView";
 import { renderBookStack } from "./bookStack";
 import { tagLeafOf } from "./parser-core";
+import { searchBooks, NlBookResult } from "./nl-api";
+import { getMetadata, setMetadata, clearMetadata, NoteMetadata } from "./note-metadata";
 
 export interface WebViewOptions {
   books: BookNote[];
@@ -81,9 +83,12 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
     close.textContent = "×";
     close.addEventListener("click", () => closePanel());
     inner.appendChild(close);
-    const title = document.createElement("h2");
-    title.textContent = b.title;
-    inner.appendChild(title);
+
+    const head = document.createElement("div");
+    head.className = "dokki-panel-head";
+    inner.appendChild(head);
+    renderHead(head, b);
+
     const meta = document.createElement("div");
     meta.className = "dokki-panel-meta";
     const bits: string[] = [];
@@ -132,6 +137,202 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
     inner.appendChild(pagesEl);
     panel.classList.add("is-open");
     panelBackdrop.classList.add("is-open");
+  }
+
+  function renderHead(head: HTMLElement, b: BookNote) {
+    head.innerHTML = "";
+    const meta = getMetadata(b.filePath);
+
+    if (meta?.coverUrl) {
+      const cover = document.createElement("img");
+      cover.className = "dokki-panel-cover";
+      cover.alt = `${meta.title} 표지`;
+      cover.loading = "lazy";
+      cover.src = meta.coverUrl;
+      cover.addEventListener("error", () => cover.remove());
+      head.appendChild(cover);
+    }
+
+    const titleWrap = document.createElement("div");
+    titleWrap.className = "dokki-panel-title-wrap";
+    const title = document.createElement("h2");
+    title.textContent = b.title;
+    titleWrap.appendChild(title);
+
+    if (meta) {
+      const sub = document.createElement("div");
+      sub.className = "dokki-panel-libinfo";
+      const subBits: string[] = [];
+      if (meta.author) subBits.push(meta.author);
+      if (meta.publisher) subBits.push(meta.publisher);
+      if (meta.pubYear) subBits.push(meta.pubYear);
+      sub.textContent = subBits.join(" · ");
+      titleWrap.appendChild(sub);
+
+      const actions = document.createElement("div");
+      actions.className = "dokki-panel-libactions";
+      const change = document.createElement("button");
+      change.className = "dokki-libaction";
+      change.textContent = "다시 검색";
+      change.addEventListener("click", () => openSearch(b));
+      const remove = document.createElement("button");
+      remove.className = "dokki-libaction dokki-libaction-quiet";
+      remove.textContent = "지우기";
+      remove.addEventListener("click", () => {
+        clearMetadata(b.filePath);
+        renderHead(head, b);
+      });
+      actions.append(change, remove);
+      titleWrap.appendChild(actions);
+    } else {
+      const search = document.createElement("button");
+      search.className = "dokki-libsearch-btn";
+      search.textContent = "+ 도서 정보 검색";
+      search.title = "국립중앙도서관에서 이 책을 검색해 표지·서지 정보를 연결";
+      search.addEventListener("click", () => openSearch(b));
+      titleWrap.appendChild(search);
+    }
+
+    head.appendChild(titleWrap);
+  }
+
+  function openSearch(b: BookNote) {
+    const overlay = document.createElement("div");
+    overlay.className = "dokki-search-overlay";
+
+    const dialog = document.createElement("div");
+    dialog.className = "dokki-search-dialog";
+
+    const head = document.createElement("div");
+    head.className = "dokki-search-head";
+    const heading = document.createElement("h3");
+    heading.textContent = "국립중앙도서관 검색";
+    head.appendChild(heading);
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "dokki-panel-close";
+    closeBtn.textContent = "×";
+    closeBtn.addEventListener("click", () => overlay.remove());
+    head.appendChild(closeBtn);
+    dialog.appendChild(head);
+
+    const form = document.createElement("form");
+    form.className = "dokki-search-form";
+    const input = document.createElement("input");
+    input.type = "search";
+    input.className = "dokki-search-input";
+    input.value = b.title;
+    input.placeholder = "제목·저자·키워드";
+    input.autofocus = true;
+    form.appendChild(input);
+    const submit = document.createElement("button");
+    submit.type = "submit";
+    submit.className = "dokki-search-submit";
+    submit.textContent = "검색";
+    form.appendChild(submit);
+    dialog.appendChild(form);
+
+    const status = document.createElement("div");
+    status.className = "dokki-search-status";
+    dialog.appendChild(status);
+
+    const results = document.createElement("div");
+    results.className = "dokki-search-results";
+    dialog.appendChild(results);
+
+    overlay.appendChild(dialog);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    document.body.appendChild(overlay);
+    setTimeout(() => input.focus(), 50);
+
+    let currentAbort: AbortController | null = null;
+
+    const run = async () => {
+      const q = input.value.trim();
+      if (!q) return;
+      currentAbort?.abort();
+      currentAbort = new AbortController();
+      results.innerHTML = "";
+      status.textContent = "검색 중…";
+      submit.disabled = true;
+      try {
+        const data = await searchBooks(q, currentAbort.signal);
+        submit.disabled = false;
+        if (!data.results.length) {
+          status.textContent = "검색 결과 없음.";
+          return;
+        }
+        status.textContent = `${data.total}건 중 ${data.results.length}건 표시`;
+        for (const r of data.results) results.appendChild(renderResultCard(r, b));
+      } catch (e) {
+        submit.disabled = false;
+        if ((e as Error).name === "AbortError") return;
+        status.textContent = `오류: ${(e as Error).message}`;
+      }
+    };
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      void run();
+    });
+    void run();
+
+    function renderResultCard(r: NlBookResult, note: BookNote): HTMLElement {
+      const card = document.createElement("button");
+      card.className = "dokki-search-card";
+      card.type = "button";
+
+      const coverBox = document.createElement("div");
+      coverBox.className = "dokki-search-cover";
+      if (r.coverUrl) {
+        const img = document.createElement("img");
+        img.src = r.coverUrl;
+        img.alt = "";
+        img.loading = "lazy";
+        img.addEventListener("error", () => {
+          img.remove();
+          coverBox.textContent = (r.title[0] ?? "?").toUpperCase();
+          coverBox.classList.add("dokki-search-cover-fallback");
+        });
+        coverBox.appendChild(img);
+      } else {
+        coverBox.textContent = (r.title[0] ?? "?").toUpperCase();
+        coverBox.classList.add("dokki-search-cover-fallback");
+      }
+      card.appendChild(coverBox);
+
+      const text = document.createElement("div");
+      text.className = "dokki-search-text";
+      const t = document.createElement("div");
+      t.className = "dokki-search-card-title";
+      t.textContent = r.title;
+      text.appendChild(t);
+      const subBits: string[] = [];
+      if (r.author) subBits.push(r.author);
+      if (r.publisher) subBits.push(r.publisher);
+      if (r.pubYear) subBits.push(r.pubYear);
+      const s = document.createElement("div");
+      s.className = "dokki-search-card-sub";
+      s.textContent = subBits.join(" · ");
+      text.appendChild(s);
+      if (r.isbn) {
+        const i = document.createElement("div");
+        i.className = "dokki-search-card-isbn";
+        i.textContent = `ISBN ${r.isbn}`;
+        text.appendChild(i);
+      }
+      card.appendChild(text);
+
+      card.addEventListener("click", () => {
+        setMetadata(note.filePath, r);
+        overlay.remove();
+        const inner = panel.querySelector(".dokki-panel-inner") as HTMLElement;
+        const head = inner.querySelector(".dokki-panel-head") as HTMLElement;
+        if (head) renderHead(head, note);
+      });
+      return card;
+    }
   }
 
   function closePanel() {

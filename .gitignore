@@ -5,6 +5,7 @@ plugin/node_modules/
 # editor / OS
 .DS_Store
 Thumbs.db
+desktop.ini
 .vscode/
 .idea/
 
@@ -23,3 +24,8 @@ dist/
 
 # private font assets (licensed; deploy via Vercel CLI, never push)
 public/fonts/
+
+# env vars (NL Korea API key, etc.)
+.env
+.env.local
+.env.*.local
