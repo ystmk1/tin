@@ -14,9 +14,21 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
     />
+    <script>
+      // FOUC-free: hide splash for returning visitors before any paint.
+      try {
+        if (localStorage.getItem("dokki:seen-splash:v1") === "1") {
+          document.documentElement.classList.add("dokki-no-splash");
+        }
+      } catch (_) {}
+    </script>
     <title>DoKKi</title>
   </head>
   <body>
+    <div id="dokki-splash" aria-hidden="false">
+      <p class="dokki-splash-text">A book must be the axe for the frozen sea within us.</p>
+      <p class="dokki-splash-attr">— Franz Kafka</p>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
