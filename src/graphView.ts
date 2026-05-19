@@ -63,7 +63,8 @@ export function renderGraph(
   const links: SimLink[] = rawLinks.map((l) => ({ source: l.source, target: l.target }));
 
   const maxDeg = Math.max(1, ...nodes.map((n) => n.degree));
-  const radius = (d: SimNode) => 3 + 5 * Math.sqrt(d.degree / maxDeg);
+  // Slightly smaller dots overall; high-degree still visibly bigger.
+  const radius = (d: SimNode) => 2 + 3.2 * Math.sqrt(d.degree / maxDeg);
   const linkWidth = (a: SimNode, b: SimNode) => {
     const avg = (a.degree + b.degree) / 2;
     return 0.4 + 1.4 * (avg / maxDeg);
@@ -77,18 +78,20 @@ export function renderGraph(
       "link",
       forceLink<SimNode, SimLink>(links)
         .id((d) => d.id)
+        // Wider resting spacing overall; many-connected pairs still pull closer.
         .distance((l) => {
           const s = l.source as SimNode;
           const t = l.target as SimNode;
-          return 22 + 30 / Math.max(1, (s.degree + t.degree) / 2);
+          return 48 + 55 / Math.max(1, (s.degree + t.degree) / 2);
         })
-        .strength(0.35),
+        .strength(0.32),
     )
-    .force("charge", forceManyBody().strength((d) => -30 - 40 * Math.sqrt((d as SimNode).degree / maxDeg)))
+    // Stronger general repulsion so non-trivial graphs breathe more.
+    .force("charge", forceManyBody().strength((d) => -55 - 55 * Math.sqrt((d as SimNode).degree / maxDeg)))
     .force("center", forceCenter(cx, cy).strength(0.04))
     .force("x", forceX(cx).strength((d) => 0.02 + 0.18 * ((d as SimNode).degree / maxDeg)))
     .force("y", forceY(cy).strength((d) => 0.04 + 0.25 * ((d as SimNode).degree / maxDeg)))
-    .force("collide", forceCollide<SimNode>((d) => radius(d) + 3));
+    .force("collide", forceCollide<SimNode>((d) => radius(d) + 4));
 
   const linkSel = g
     .append("g")
@@ -115,18 +118,28 @@ export function renderGraph(
 
   nodeSel.append("title").text((d) => `${d.title}${d.degree ? `  (${d.degree})` : ""}`);
 
+  // Hover-only title labels for ALL nodes (was: persistent for top 40%).
   const labelSel = g
     .append("g")
     .attr("class", "dokki-labels")
     .selectAll<SVGTextElement, SimNode>("text")
-    .data(nodes.filter((n) => n.degree / maxDeg > 0.4))
+    .data(nodes)
     .join("text")
     .text((d) => d.title)
-    .attr("font-size", 10)
-    .attr("fill", "var(--text-muted)")
+    .attr("font-size", 10.5)
+    .attr("fill", "var(--text-normal)")
     .attr("dx", 8)
     .attr("dy", 3)
+    .attr("opacity", 0)
     .style("pointer-events", "none");
+
+  nodeSel
+    .on("mouseenter", (_e, d) => {
+      labelSel.filter((l) => l.id === d.id).attr("opacity", 1);
+    })
+    .on("mouseleave", (_e, d) => {
+      labelSel.filter((l) => l.id === d.id).attr("opacity", 0);
+    });
 
   const dragBehavior = drag<SVGCircleElement, SimNode>()
     .on("start", (event, d) => {
@@ -174,17 +187,15 @@ export function renderGraph(
 
   const DIM_NODE = 0.12;
   const DIM_LINK = 0.06;
-  const DIM_LABEL = 0.15;
 
   const setHighlight = (highlightIds: Set<string> | null): void => {
+    // Labels are hover-controlled; setHighlight only adjusts nodes + links.
     if (!highlightIds || highlightIds.size === 0) {
       nodeSel.attr("opacity", 1);
       linkSel.attr("stroke-opacity", 0.55);
-      labelSel.attr("opacity", 1);
       return;
     }
     nodeSel.attr("opacity", (d) => (highlightIds.has(d.id) ? 1 : DIM_NODE));
-    labelSel.attr("opacity", (d) => (highlightIds.has(d.id) ? 1 : DIM_LABEL));
     linkSel.attr("stroke-opacity", (d) => {
       const sId = typeof d.source === "string" ? d.source : d.source.id;
       const tId = typeof d.target === "string" ? d.target : d.target.id;

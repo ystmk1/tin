@@ -144,7 +144,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
 .dokki-quote {
   font-family: var(--font-display);
   font-size: 1.5rem;
-  line-height: 1.5;
+  line-height: 1.42;
   font-weight: 500;
   margin: 0;
   padding: 0;

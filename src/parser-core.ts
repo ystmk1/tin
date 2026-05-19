@@ -105,8 +105,19 @@ function normalizeFrontmatter(fm: Record<string, unknown>): BookFrontmatter {
 
 function strOrUndef(v: unknown): string | undefined {
   if (v === undefined || v === null) return undefined;
+  // js-yaml parses ISO timestamps (e.g. `2026-04-23`) as Date instances.
+  // Coercing those via String() yields long locale strings like
+  // "Thu Apr 23 2026 00:00:00 GMT+0900 (KST)" — collapse to YYYY-MM-DD.
+  if (v instanceof Date && !isNaN(v.getTime())) return formatDate(v);
   const s = String(v).trim();
   return s.length ? s : undefined;
+}
+
+function formatDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function extractStoppedPage(status?: string): number | undefined {

@@ -403,7 +403,7 @@ function renderExcerpt(
     const b = books.find((x) => x.filePath === pick.filePath);
     const quote = document.createElement("blockquote");
     quote.className = "dokki-quote";
-    quote.textContent = pick.text;
+    quote.textContent = stripWrappingQuotes(pick.text);
     wrap.appendChild(quote);
     const meta = document.createElement("div");
     meta.className = "dokki-quote-meta";
@@ -641,6 +641,27 @@ function spanOf(text: string): HTMLElement {
   const s = document.createElement("span");
   s.textContent = text;
   return s;
+}
+
+// When the bold excerpt is a dialogue wrapped in matching quotes,
+// strip the outer pair at render time only — CSS already adds visual
+// curly quotes (“ ”) via ::before/::after, so the typed quotes would
+// double up. The source .md is never touched.
+const QUOTE_PAIRS: Record<string, string> = {
+  '"': '"',
+  "'": "'",
+  "“": "”", // " "
+  "‘": "’", // ' '
+  "「": "」",
+  "『": "』",
+};
+function stripWrappingQuotes(s: string): string {
+  const t = s.trim();
+  if (t.length < 2) return s;
+  const expected = QUOTE_PAIRS[t[0]];
+  if (!expected) return s;
+  if (t[t.length - 1] !== expected) return s;
+  return t.slice(1, -1).trim();
 }
 
 // Rounded star SVG path (chunky body, soft tips).
