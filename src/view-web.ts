@@ -35,7 +35,7 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
   brandImg.height = 28;
   brand.appendChild(brandImg);
   const brandName = document.createElement("span");
-  brandName.textContent = "DoKKi";
+  brandName.textContent = "A book must be the axe for the frozen sea within us.";
   brand.appendChild(brandName);
   header.appendChild(brand);
   const repoLink = document.createElement("a");
