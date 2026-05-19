@@ -4,6 +4,8 @@
 //   - vite.config.ts middleware (local dev)
 // API doc: https://www.nl.go.kr/NL/contents/N31101000000.do (openAPI 자료검색)
 
+import { formatAuthor } from "./author-format";
+
 const NL_API_URL = "https://www.nl.go.kr/NL/search/openApi/search.do";
 
 export type BookSource = "nl" | "aladin";
@@ -101,7 +103,7 @@ function getField(data: unknown, ...keys: string[]): unknown {
 
 function normalizeItem(item: Record<string, unknown>): NlBookResult {
   const title = clean(String(item.title_info ?? item.title ?? ""));
-  const author = optional(item.author_info ?? item.author);
+  const author = formatAuthor(optional(item.author_info ?? item.author));
   const publisher = optional(item.pub_info ?? item.publisher);
   const pubYear = extractYear(item.pub_year_info ?? item.pub_year);
   const isbn = pickIsbn(item.isbn);
