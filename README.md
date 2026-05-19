@@ -1,3 +1,7 @@
+<p align="left">
+  <img src="favicon_io/android-chrome-192x192.png" alt="DoKKi" width="72" height="72" />
+</p>
+
 # DoKKi
 
 독서 발췌 노트를 위한 옵시디언 플러그인. 메인 화면은 세 층으로 구성됩니다.
