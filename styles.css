@@ -1,0 +1,207 @@
+/* DoKKi — minimal reading explorer */
+
+.dokki-root {
+  --dokki-pad: 14px;
+  --dokki-radius: 4px;
+  --dokki-branch: var(--text-faint);
+  --dokki-node: var(--text-normal);
+  --dokki-node-stroke: var(--background-modifier-border);
+  padding: 22px 28px 40px;
+  max-width: 980px;
+  margin: 0 auto;
+  font-family: var(--font-text);
+  color: var(--text-normal);
+}
+
+/* === EXCERPT (top) === */
+.dokki-excerpt {
+  position: relative;
+  padding: 8px 36px 18px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 14px;
+}
+.dokki-quote {
+  font-size: 1.25rem;
+  line-height: 1.55;
+  font-weight: 400;
+  margin: 0 0 6px;
+  padding: 0;
+  border: none;
+  color: var(--text-normal);
+  font-style: normal;
+  letter-spacing: -0.005em;
+}
+.dokki-quote::before { content: "“"; opacity: 0.4; margin-right: 2px; }
+.dokki-quote::after  { content: "”"; opacity: 0.4; margin-left: 2px; }
+.dokki-quote-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.dokki-quote-title {
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-normal);
+}
+.dokki-quote-title:hover { text-decoration: underline; }
+.dokki-quote-sep { margin: 0 4px; opacity: 0.5; }
+.dokki-reroll {
+  position: absolute;
+  top: 8px; right: 0;
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 50%;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: transform 0.4s ease;
+}
+.dokki-reroll:hover { transform: rotate(180deg); color: var(--text-normal); }
+.dokki-excerpt-empty { color: var(--text-muted); font-size: 0.85rem; }
+
+/* === CONTROLS === */
+.dokki-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  align-items: center;
+  padding: 6px 0 14px;
+  font-size: 0.82rem;
+}
+.dokki-search {
+  flex: 1 1 220px;
+  min-width: 180px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding: 4px 2px;
+  color: var(--text-normal);
+  font-size: 0.85rem;
+  outline: none;
+}
+.dokki-search:focus { border-bottom-color: var(--text-normal); }
+.dokki-basis, .dokki-filters { display: flex; gap: 4px; align-items: center; color: var(--text-muted); }
+.dokki-basis button, .dokki-reload {
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: 99px;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+.dokki-basis button.is-active {
+  background: var(--text-normal);
+  color: var(--background-primary);
+  border-color: var(--text-normal);
+}
+.dokki-select {
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 99px;
+  padding: 2px 8px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.dokki-reload:hover { color: var(--text-normal); }
+
+/* === GRAPH (middle) === */
+.dokki-graph-wrap {
+  width: 100%;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--dokki-radius);
+  background: var(--background-secondary);
+  overflow: hidden;
+  margin-bottom: 26px;
+  position: relative;
+}
+.dokki-graph-svg { display: block; }
+.dokki-graph-svg circle { transition: r 0.15s ease, fill 0.15s; }
+.dokki-graph-svg circle:hover { fill: var(--interactive-accent); }
+
+/* === BOOK STACK (bottom) — spines === */
+.dokki-stack-wrap { width: 100%; }
+.dokki-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* stack appearance: most recent on top, oldest at bottom (matches DOM order) */
+}
+.dokki-stack-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.dokki-spine {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  background:
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 2px,
+      hsla(var(--spine-hue, 30), 18%, 50%, 0.06) 2px,
+      hsla(var(--spine-hue, 30), 18%, 50%, 0.06) calc(100% - 2px),
+      transparent calc(100% - 2px)
+    );
+  border-top: 1px solid hsla(var(--spine-hue, 30), 22%, 50%, 0.18);
+  border-bottom: 1px solid hsla(var(--spine-hue, 30), 22%, 30%, 0.10);
+  border-left: 3px solid hsla(var(--spine-hue, 30), 35%, 45%, 0.5);
+  cursor: pointer;
+  transition: padding-left 0.12s ease, background 0.12s ease;
+}
+.dokki-spine:hover {
+  padding-left: 22px;
+  background:
+    linear-gradient(
+      to right,
+      hsla(var(--spine-hue, 30), 30%, 50%, 0.08),
+      transparent 60%
+    );
+}
+.dokki-spine[data-status="reading"]  { border-left-color: hsla(var(--spine-hue, 30), 55%, 50%, 0.85); }
+.dokki-spine[data-status="finished"] { border-left-color: hsla(var(--spine-hue, 30), 25%, 35%, 0.55); }
+.dokki-spine[data-status="stopped"]  { border-left-color: hsla(var(--spine-hue, 30), 10%, 40%, 0.4); border-left-style: dashed; }
+.dokki-spine[data-status="unknown"]  { border-left-color: var(--background-modifier-border); }
+
+.dokki-spine-inner {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  width: 100%;
+  font-size: 0.86rem;
+  min-width: 0;
+}
+.dokki-spine-title {
+  font-weight: 500;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  max-width: 50%;
+}
+.dokki-spine-meta {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.dokki-spine-sep { opacity: 0.5; }
+.dokki-spine-status {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+  flex-shrink: 0;
+}

@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# build artifacts inside the test vault (the real build at repo root is committed)
+test-vault/.obsidian/plugins/dokki/
+
+# obsidian workspace state inside test-vault
+test-vault/.obsidian/workspace*.json
+test-vault/.obsidian/cache
+test-vault/.obsidian/hotkeys.json
+
+# sourcemaps for dev builds
+*.js.map
