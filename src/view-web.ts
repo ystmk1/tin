@@ -219,7 +219,7 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
     const head = document.createElement("div");
     head.className = "dokki-search-head";
     const heading = document.createElement("h3");
-    heading.textContent = "국립중앙도서관 검색";
+    heading.textContent = "서지정보 검색";
     head.appendChild(heading);
     const closeBtn = document.createElement("button");
     closeBtn.className = "dokki-panel-close";
