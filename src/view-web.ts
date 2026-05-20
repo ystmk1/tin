@@ -153,10 +153,12 @@ export function mountWebView({
         chip.textContent = status;
         tags.appendChild(chip);
       }
-      for (const t of b.frontmatter.tags) {
+      // No "#"; hierarchical tags are shown gathered as a path,
+      // e.g. 문학 / 해외문학 / 프랑스문학 → "문학/해외문학/프랑스문학".
+      if (b.frontmatter.tags.length) {
         const span = document.createElement("span");
         span.className = "dokki-tag";
-        span.textContent = "# " + t;
+        span.textContent = b.frontmatter.tags.join("/");
         tags.appendChild(span);
       }
       inner.appendChild(tags);
