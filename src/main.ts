@@ -2,14 +2,30 @@ import "./dom-polyfill";
 import "./styles.css";
 import { loadBooks } from "./notes";
 import { mountWebView } from "./view-web";
+import { initAuth } from "./auth";
+import { initMetadata } from "./note-metadata";
 
 const app = document.getElementById("app");
 if (!app) throw new Error("#app not found");
 
 const books = loadBooks();
-mountWebView({ books, mount: app });
 
-dismissSplash();
+// Resolve any existing session, then load metadata from the right backend
+// (cloud if signed in, else localStorage). The view also re-inits metadata
+// on later auth changes. We don't block the first paint on the network —
+// the view mounts immediately and refreshes when metadata resolves.
+void bootstrap();
+
+async function bootstrap() {
+  // 1) Load whatever's cached locally so the first paint is instant.
+  await initMetadata();
+  // 2) Mount the UI (this registers the auth-change listener).
+  mountWebView({ books, mount: app! });
+  dismissSplash();
+  // 3) Resolve the session. If signed in, the view's auth listener
+  //    re-runs initMetadata against the cloud and refreshes the panel.
+  await initAuth();
+}
 
 function dismissSplash(): void {
   const splash = document.getElementById("dokki-splash");

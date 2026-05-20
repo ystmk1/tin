@@ -3,7 +3,9 @@ import { renderGraph, type GraphHandle } from "./graphView";
 import { renderBookStack } from "./bookStack";
 import { tagLeafOf } from "./parser-core";
 import { searchBooks, NlBookResult } from "./nl-api";
-import { getMetadata, setMetadata, clearMetadata } from "./note-metadata";
+import { getMetadata, setMetadata, clearMetadata, initMetadata } from "./note-metadata";
+import { isCloudEnabled } from "./supabase";
+import { onAuthChange, signInWith, signOut, userLabel, getUser } from "./auth";
 
 export interface WebViewOptions {
   books: BookNote[];
@@ -18,6 +20,7 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
     search: "",
   };
   let graph: GraphHandle | null = null;
+  let lastOpenedBook: BookNote | null = null;
 
   mount.classList.add("dokki-root");
   mount.innerHTML = "";
@@ -31,14 +34,40 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
   brandName.textContent = "도끼";
   brand.appendChild(brandName);
   header.appendChild(brand);
+  const headerRight = document.createElement("div");
+  headerRight.className = "dokki-header-right";
   const repoLink = document.createElement("a");
   repoLink.className = "dokki-repo-link";
   repoLink.href = "https://github.com/ystmk1/DoKKi";
   repoLink.target = "_blank";
   repoLink.rel = "noopener";
   repoLink.textContent = "GitHub →";
-  header.appendChild(repoLink);
+  headerRight.appendChild(repoLink);
+  const authSlot = document.createElement("div");
+  authSlot.className = "dokki-auth";
+  headerRight.appendChild(authSlot);
+  header.appendChild(headerRight);
   mount.appendChild(header);
+
+  // Auth control reflects cloud sync state. When cloud is disabled
+  // (Supabase env not set), the slot stays empty and everything runs
+  // off localStorage exactly as before.
+  if (isCloudEnabled) {
+    onAuthChange((user) => {
+      renderAuthSlot(authSlot);
+      // Reload metadata for the new identity, then refresh anything
+      // currently on screen that depends on it.
+      void initMetadata().then(() => {
+        if (panel.classList.contains("is-open") && lastOpenedBook) {
+          renderHead(
+            panel.querySelector(".dokki-panel-head") as HTMLElement,
+            lastOpenedBook,
+          );
+        }
+      });
+      void user;
+    });
+  }
 
   const excerptWrap = document.createElement("div");
   excerptWrap.className = "dokki-excerpt";
@@ -71,6 +100,7 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
   mount.appendChild(panelBackdrop);
 
   function openNote(b: BookNote) {
+    lastOpenedBook = b;
     const inner = panel.querySelector(".dokki-panel-inner") as HTMLElement;
     inner.innerHTML = "";
     const close = document.createElement("button");
@@ -379,6 +409,47 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
       const b = books.find((x) => x.filePath === path);
       if (b) openNote(b);
     });
+  }
+
+  function renderAuthSlot(slot: HTMLElement) {
+    slot.innerHTML = "";
+    const user = getUser();
+    if (user) {
+      const name = document.createElement("span");
+      name.className = "dokki-auth-name";
+      name.textContent = userLabel(user);
+      const out = document.createElement("button");
+      out.className = "dokki-auth-btn";
+      out.textContent = "로그아웃";
+      out.addEventListener("click", () => void signOut());
+      slot.append(name, out);
+      return;
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "dokki-auth-login";
+    const trigger = document.createElement("button");
+    trigger.className = "dokki-auth-btn";
+    trigger.textContent = "로그인";
+    const menu = document.createElement("div");
+    menu.className = "dokki-auth-menu";
+    const g = document.createElement("button");
+    g.className = "dokki-auth-provider";
+    g.textContent = "Google로 로그인";
+    g.addEventListener("click", () => void signInWith("google"));
+    const k = document.createElement("button");
+    k.className = "dokki-auth-provider";
+    k.textContent = "Kakao로 로그인";
+    k.addEventListener("click", () => void signInWith("kakao"));
+    menu.append(g, k);
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      menu.classList.toggle("is-open");
+    });
+    document.addEventListener("click", (e) => {
+      if (!wrap.contains(e.target as Node)) menu.classList.remove("is-open");
+    });
+    wrap.append(trigger, menu);
+    slot.appendChild(wrap);
   }
 
   renderGraphSection();

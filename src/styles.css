@@ -124,12 +124,80 @@ html.dokki-no-splash #dokki-splash { display: none; }
   border-radius: 4px;
   line-height: 1.4;
 }
+.dokki-header-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
 .dokki-repo-link {
   color: var(--text-muted);
   text-decoration: none;
   font-size: 0.85rem;
 }
 .dokki-repo-link:hover { color: var(--text-normal); }
+
+/* === Auth === */
+.dokki-auth {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-ui);
+}
+.dokki-auth-name {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dokki-auth-btn {
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  padding: 4px 12px;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: -0.01em;
+}
+.dokki-auth-btn:hover {
+  color: var(--text-normal);
+  border-color: var(--text-normal);
+}
+.dokki-auth-login { position: relative; }
+.dokki-auth-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  padding: 6px;
+  z-index: 30;
+  min-width: 160px;
+}
+.dokki-auth-menu.is-open { display: flex; animation: dokki-popover-in 0.14s ease-out; }
+.dokki-auth-provider {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--text-normal);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dokki-auth-provider:hover { background: var(--background-secondary); }
 
 /* === EXCERPT === */
 .dokki-excerpt {
