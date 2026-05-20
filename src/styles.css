@@ -757,25 +757,19 @@ html.dokki-no-splash #dokki-splash { display: none; }
     display: none;
   }
 
-  /* Spine row: title left (takes all it can), author right with only a
-     minimal gap. Status chip + publisher hidden; the colored left border
-     still indicates reading status. */
-  .dokki-spine-inner { gap: 8px; }
+  /* Spine row is a grid; on mobile drop to 2 columns so the title fills
+     and the author hugs the right edge with only a tight gap. (Status
+     column is removed since the chip is hidden — otherwise its empty
+     `auto` track left the author stranded mid-row.) */
   .dokki-spine-status { display: none; }
-  .dokki-spine-title {
-    max-width: none;   /* lift the desktop 50% cap */
-    flex: 1 1 auto;    /* grow into the free space, push author to the edge */
+  .dokki-spine-inner {
+    grid-template-columns: 1fr auto;
+    gap: 10px;
   }
   .dokki-spine-meta {
-    display: inline-block;
-    margin-left: 0;     /* title's flex-grow handles the spacing now */
     text-align: right;
-    flex: 0 1 auto;     /* size to content; shrink (ellipsis) only if huge */
-    min-width: 0;
-    max-width: 40%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    justify-self: end;
+    max-width: 100%;
   }
   /* Hide separator + publisher; only the author span remains. */
   .dokki-spine-sep,
