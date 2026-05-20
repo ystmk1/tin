@@ -604,6 +604,14 @@ html.dokki-no-splash #dokki-splash { display: none; }
   );
 }
 
+/* When a cover colour is known, the left status band takes that colour; the
+   reading status is then carried by luminance (alpha) + line style only:
+   완독 full · 중단 dimmed solid · 읽는 중 dimmed dashed. Placed after the
+   neutral status rules so it wins (equal specificity). */
+.dokki-spine-tinted[data-status="finished"] { --spine-color: rgba(var(--spine-tint), 0.95); }
+.dokki-spine-tinted[data-status="stopped"]  { --spine-color: rgba(var(--spine-tint), 0.5); }
+.dokki-spine-tinted[data-status="reading"]  { --spine-color: rgba(var(--spine-tint), 0.5); }
+
 /* Desktop: title (left) · author/publisher (middle) · status+date (right).
    All tracks are fr-based so the author column stays put regardless of how
    long the status text is. */

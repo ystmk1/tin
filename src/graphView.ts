@@ -38,6 +38,8 @@ export interface GraphHandle {
    * across highlight changes — Obsidian-style.
    */
   setHighlight: (highlightIds: Set<string> | null) => void;
+  /** Re-read cover colours and repaint the stars (after a cover is linked). */
+  recolor: () => void;
 }
 
 // --- space look ---------------------------------------------------------
@@ -401,9 +403,17 @@ export function renderGraph(
       starTex.dispose();
       linkGeo.dispose();
       (linkLines.material as THREE.Material).dispose();
+      // dispose() alone leaks the GL context; force it so repeated reloads
+      // (login swaps the view several times) don't exhaust the browser limit.
+      renderer.forceContextLoss();
       renderer.dispose();
       cv.remove();
     },
     setHighlight,
+    recolor: () => {
+      for (let i = 0; i < nodes.length; i++) {
+        (sprites[i].material as THREE.SpriteMaterial).color.copy(starColor(nodes[i]));
+      }
+    },
   };
 }

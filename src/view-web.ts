@@ -466,6 +466,7 @@ export function mountWebView({
             if (!color) return;
             setCoverColor(note.filePath, color);
             renderStack();
+            graph?.recolor(); // repaint the matching star with the new cover tint
           });
         }
       });
