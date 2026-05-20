@@ -494,13 +494,32 @@ html.dokki-no-splash #dokki-splash { display: none; }
   width: 100%;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--dokki-radius);
-  background: var(--background-secondary);
+  /* Deep-space gradient sits behind the transparent WebGL canvas. */
+  background:
+    radial-gradient(120% 90% at 30% 20%, #11183a 0%, #0a0e22 45%, #05060f 100%);
   overflow: hidden;
   position: relative;
 }
-.dokki-graph-svg { display: block; }
-.dokki-graph-svg circle { transition: r 0.15s ease, fill 0.15s; }
-.dokki-graph-svg circle:hover { fill: var(--interactive-accent); }
+.dokki-graph-canvas {
+  display: block;
+  touch-action: none; /* let pointer drag/zoom own the gestures */
+}
+/* Floating note title on hover. */
+.dokki-graph-label {
+  position: absolute;
+  pointer-events: none;
+  z-index: 5;
+  padding: 2px 7px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #f3f6ff;
+  background: rgba(10, 14, 34, 0.72);
+  border: 1px solid rgba(150, 170, 255, 0.25);
+  border-radius: 4px;
+  white-space: nowrap;
+  transform: translateY(-100%);
+  backdrop-filter: blur(2px);
+}
 
 /* Upload button floats over the graph box, bottom-right. */
 .dokki-upload-slot {
