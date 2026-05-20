@@ -54,11 +54,25 @@ export function buildGraph(books: BookNote[]): { nodes: GraphNode[]; links: Grap
   return { nodes, links };
 }
 
+// Tags that are too broad to make a meaningful graph link — connecting on
+// "소설" or "문학" links almost everything. We connect on the more specific
+// level instead (한국문학 / 중국문학 / 프랑스문학 …). Edit this set to taste.
+const GENERIC_TAGS = new Set([
+  "문학", "소설", "시", "에세이", "산문", "수필", "희곡", "장편소설", "단편소설",
+  "단편집", "소설집", "만화", "그래픽노블",
+  // demo-note tags
+  "안내", "사용법", "속성",
+]);
+
 function keysFor(b: BookNote): string[] {
   const keys: string[] = [];
   if (b.frontmatter.author) keys.push(`author:${b.frontmatter.author}`);
   const leaves = new Set<string>();
-  for (const t of b.frontmatter.tags) leaves.add(tagLeafOf(t));
+  for (const t of b.frontmatter.tags) {
+    const leaf = tagLeafOf(t);
+    if (GENERIC_TAGS.has(leaf)) continue; // skip over-broad tags
+    leaves.add(leaf);
+  }
   for (const leaf of leaves) keys.push(`tag:${leaf}`);
   return keys;
 }

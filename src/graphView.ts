@@ -63,8 +63,9 @@ export function renderGraph(
   const links: SimLink[] = rawLinks.map((l) => ({ source: l.source, target: l.target }));
 
   const maxDeg = Math.max(1, ...nodes.map((n) => n.degree));
-  // Slightly smaller dots overall; high-degree still visibly bigger.
-  const radius = (d: SimNode) => 2 + 3.2 * Math.sqrt(d.degree / maxDeg);
+  // Small dots with a gentle growth — high-degree nodes are still a bit
+  // bigger but the spread is subtle (was 2 + 3.2·√).
+  const radius = (d: SimNode) => 1.6 + 1.8 * Math.sqrt(d.degree / maxDeg);
   const linkWidth = (a: SimNode, b: SimNode) => {
     const avg = (a.degree + b.degree) / 2;
     return 0.4 + 1.4 * (avg / maxDeg);
