@@ -138,9 +138,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
 
 /* Footer — GitHub link at the very bottom (desktop only; hidden on mobile). */
 .dokki-footer {
-  margin-top: 48px;
-  padding-top: 20px;
-  border-top: 1px solid var(--background-modifier-border);
+  margin-top: 28px;
   display: flex;
   justify-content: flex-end;
 }
@@ -150,7 +148,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
   font-family: var(--font-ui);
 }
 .dokki-auth-name {
@@ -488,16 +486,20 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 
 /* === BOOK STACK === */
-.dokki-stack { display: flex; flex-direction: column; gap: 2px; }
+.dokki-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid var(--background-modifier-border); /* line under the bottom-most book */
+}
 .dokki-stack-empty {
   padding: 24px;
   text-align: center;
   color: var(--text-muted);
   font-size: 0.85rem;
 }
-/* Status color — a single muted dot of color on the left border. Minimal:
-   solid, low-saturation, no fills/dashes. reading / finished / stopped /
-   unknown each get a calm hue. */
+/* Restored: subtle paper-like vertical gradient + horizontal hover sweep.
+   Only the LEFT band carries reading status (color/style per status). */
 .dokki-spine {
   --spine-color: var(--background-modifier-border);
   position: relative;
@@ -505,18 +507,34 @@ html.dokki-no-splash #dokki-splash { display: none; }
   align-items: center;
   height: 36px;
   padding: 0 14px;
-  border-top: 1px solid var(--background-modifier-border);
-  border-left: 2px solid var(--spine-color);
+  background:
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 2px,
+      hsla(30, 18%, 50%, 0.06) 2px,
+      hsla(30, 18%, 50%, 0.06) calc(100% - 2px),
+      transparent calc(100% - 2px)
+    );
+  border-top: 1px solid hsla(30, 22%, 50%, 0.16);
+  border-bottom: 1px solid hsla(30, 22%, 30%, 0.08);
+  border-left: 3px solid var(--spine-color);
   cursor: pointer;
   transition: padding-left 0.12s ease, background 0.12s ease;
 }
 .dokki-spine:hover {
-  padding-left: 20px;
-  background: var(--background-secondary);
+  padding-left: 22px;
+  background:
+    linear-gradient(
+      to right,
+      hsla(30, 30%, 50%, 0.10),
+      transparent 60%
+    );
 }
-.dokki-spine[data-status="reading"]  { --spine-color: hsl(210, 45%, 60%); }
-.dokki-spine[data-status="finished"] { --spine-color: hsl(150, 28%, 52%); }
-.dokki-spine[data-status="stopped"]  { --spine-color: hsl(30, 35%, 62%); }
+/* Left status band: 완독 black solid · 중단 gray solid · 읽는 중 light dashed. */
+.dokki-spine[data-status="finished"] { --spine-color: var(--text-normal); }
+.dokki-spine[data-status="stopped"]  { --spine-color: var(--text-muted); }
+.dokki-spine[data-status="reading"]  { --spine-color: var(--text-faint); border-left-style: dashed; }
 .dokki-spine[data-status="unknown"]  { --spine-color: var(--background-modifier-border); }
 
 /* Desktop: title (left) · author/publisher (middle) · status+date (right).
