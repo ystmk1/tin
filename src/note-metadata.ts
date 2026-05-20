@@ -94,9 +94,13 @@ export async function initMetadata(): Promise<void> {
       cache = readLocal();
       return;
     }
-    const next: Store = {};
-    for (const row of data ?? []) next[row.note_path] = rowToMeta(row);
-    cache = next;
+    const cloudMap: Store = {};
+    for (const row of data ?? []) cloudMap[row.note_path] = rowToMeta(row);
+    // Merge cloud over local: cloud is the source of truth, but keep any
+    // local-only entries so a cloud/setup problem (e.g. a missing column that
+    // makes every upsert fail) can't silently wipe selections that never
+    // managed to persist. Re-migration above pushes them up once it can.
+    cache = { ...readLocal(), ...cloudMap };
     writeLocal(cache);
   } else {
     cache = readLocal();
