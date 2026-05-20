@@ -57,16 +57,6 @@ export function mountWebView({
   header.appendChild(brand);
   const headerRight = document.createElement("div");
   headerRight.className = "dokki-header-right";
-  const repoLink = document.createElement("a");
-  repoLink.className = "dokki-repo-link";
-  repoLink.href = "https://github.com/ystmk1/DoKKi";
-  repoLink.target = "_blank";
-  repoLink.rel = "noopener";
-  repoLink.textContent = "GitHub →";
-  headerRight.appendChild(repoLink);
-  const uploadSlot = document.createElement("div");
-  uploadSlot.className = "dokki-upload-slot";
-  headerRight.appendChild(uploadSlot);
   const authSlot = document.createElement("div");
   authSlot.className = "dokki-auth";
   headerRight.appendChild(authSlot);
@@ -80,13 +70,34 @@ export function mountWebView({
   const controlsHolder = document.createElement("div");
   mount.appendChild(controlsHolder);
 
+  // Graph section wraps the svg holder + the upload button overlay, so the
+  // button survives graph re-renders (which clear only the svg holder).
+  const graphSection = document.createElement("div");
+  graphSection.className = "dokki-graph-section";
   const graphWrap = document.createElement("div");
   graphWrap.className = "dokki-graph-wrap";
-  mount.appendChild(graphWrap);
+  graphSection.appendChild(graphWrap);
+  const uploadSlot = document.createElement("div");
+  uploadSlot.className = "dokki-upload-slot";
+  graphSection.appendChild(uploadSlot);
+  mount.appendChild(graphSection);
 
   const stackWrap = document.createElement("div");
   stackWrap.className = "dokki-stack-wrap";
   mount.appendChild(stackWrap);
+
+  // GitHub link lives at the very bottom now (desktop only, via CSS) — you
+  // scroll past the book stack to reach it.
+  const footer = document.createElement("footer");
+  footer.className = "dokki-footer";
+  const repoLink = document.createElement("a");
+  repoLink.className = "dokki-repo-link";
+  repoLink.href = "https://github.com/ystmk1/DoKKi";
+  repoLink.target = "_blank";
+  repoLink.rel = "noopener";
+  repoLink.textContent = "GitHub →";
+  footer.appendChild(repoLink);
+  mount.appendChild(footer);
 
   const panel = document.createElement("aside");
   panel.className = "dokki-panel";

@@ -29,9 +29,25 @@ export function renderBookStack(
       }
       meta.createSpan({ cls: "dokki-spine-publisher", text: b.frontmatter.publisher });
     }
-    // Reading status is conveyed by the spine's color (via data-status in CSS),
-    // not a variable-width text column — that kept the author column aligned.
+    // Status + date on the right (desktop). Hidden on mobile via CSS; the
+    // colored left border conveys status there. Columns are fr-based so the
+    // author stays aligned regardless of status-text length.
+    const status = inner.createDiv({ cls: "dokki-spine-status" });
+    status.setText(statusLabel(b));
     row.addEventListener("click", () => onOpen(b.filePath));
+  }
+}
+
+function statusLabel(b: BookNote): string {
+  switch (b.status) {
+    case "reading":
+      return "읽는 중";
+    case "stopped":
+      return b.frontmatter.stoppedAtPage ? `p.${b.frontmatter.stoppedAtPage} 중단` : "중단";
+    case "finished":
+      return b.frontmatter.endDate ? `완독 · ${b.frontmatter.endDate}` : "완독";
+    default:
+      return b.frontmatter.rawStatus ?? "";
   }
 }
 

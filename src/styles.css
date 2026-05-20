@@ -136,6 +136,15 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 .dokki-repo-link:hover { color: var(--text-normal); }
 
+/* Footer — GitHub link at the very bottom (desktop only; hidden on mobile). */
+.dokki-footer {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--background-modifier-border);
+  display: flex;
+  justify-content: flex-end;
+}
+
 /* === Auth === */
 .dokki-auth {
   position: relative;
@@ -198,8 +207,6 @@ html.dokki-no-splash #dokki-splash { display: none; }
   white-space: nowrap;
 }
 .dokki-auth-provider:hover { background: var(--background-secondary); }
-
-.dokki-upload-slot { display: inline-flex; }
 
 /* Drag & drop overlay for uploading .md notes */
 .dokki-drop-overlay {
@@ -452,18 +459,33 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 
 /* === GRAPH === */
+.dokki-graph-section {
+  position: relative;
+  margin-bottom: 28px;
+}
 .dokki-graph-wrap {
   width: 100%;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--dokki-radius);
   background: var(--background-secondary);
   overflow: hidden;
-  margin-bottom: 28px;
   position: relative;
 }
 .dokki-graph-svg { display: block; }
 .dokki-graph-svg circle { transition: r 0.15s ease, fill 0.15s; }
 .dokki-graph-svg circle:hover { fill: var(--interactive-accent); }
+
+/* Upload button floats over the graph box, bottom-right. */
+.dokki-upload-slot {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 5;
+}
+.dokki-upload-slot .dokki-auth-btn {
+  background: var(--background-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
 
 /* === BOOK STACK === */
 .dokki-stack { display: flex; flex-direction: column; gap: 2px; }
@@ -473,8 +495,9 @@ html.dokki-no-splash #dokki-splash { display: none; }
   color: var(--text-muted);
   font-size: 0.85rem;
 }
-/* Status colors — the spine's left border + tint encode reading status.
-   reading=blue, finished=green, stopped=amber(dashed), unknown=faint. */
+/* Status color — a single muted dot of color on the left border. Minimal:
+   solid, low-saturation, no fills/dashes. reading / finished / stopped /
+   unknown each get a calm hue. */
 .dokki-spine {
   --spine-color: var(--background-modifier-border);
   position: relative;
@@ -482,32 +505,26 @@ html.dokki-no-splash #dokki-splash { display: none; }
   align-items: center;
   height: 36px;
   padding: 0 14px;
-  background: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--spine-color) 8%, transparent),
-    transparent 50%
-  );
   border-top: 1px solid var(--background-modifier-border);
-  border-left: 3px solid var(--spine-color);
+  border-left: 2px solid var(--spine-color);
   cursor: pointer;
   transition: padding-left 0.12s ease, background 0.12s ease;
 }
 .dokki-spine:hover {
-  padding-left: 22px;
-  background: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--spine-color) 16%, transparent),
-    transparent 60%
-  );
+  padding-left: 20px;
+  background: var(--background-secondary);
 }
-.dokki-spine[data-status="reading"]  { --spine-color: hsl(210, 70%, 55%); }
-.dokki-spine[data-status="finished"] { --spine-color: hsl(145, 45%, 45%); }
-.dokki-spine[data-status="stopped"]  { --spine-color: hsl(28, 70%, 55%); border-left-style: dashed; }
-.dokki-spine[data-status="unknown"]  { --spine-color: var(--text-faint); }
+.dokki-spine[data-status="reading"]  { --spine-color: hsl(210, 45%, 60%); }
+.dokki-spine[data-status="finished"] { --spine-color: hsl(150, 28%, 52%); }
+.dokki-spine[data-status="stopped"]  { --spine-color: hsl(30, 35%, 62%); }
+.dokki-spine[data-status="unknown"]  { --spine-color: var(--background-modifier-border); }
 
+/* Desktop: title (left) · author/publisher (middle) · status+date (right).
+   All tracks are fr-based so the author column stays put regardless of how
+   long the status text is. */
 .dokki-spine-inner {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.5fr) minmax(0, 1fr);
   align-items: baseline;
   gap: 16px;
   width: 100%;
@@ -530,11 +547,20 @@ html.dokki-no-splash #dokki-splash { display: none; }
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: -0.01em;
-  justify-self: end;
-  text-align: right;
-  max-width: 100%;
+  min-width: 0;
 }
 .dokki-spine-sep { opacity: 0.4; margin: 0 4px; }
+.dokki-spine-status {
+  justify-self: end;
+  text-align: right;
+  color: var(--text-faint);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* === DETAIL PANEL === */
 .dokki-panel {
@@ -817,17 +843,26 @@ html.dokki-no-splash #dokki-splash { display: none; }
 @media (max-width: 768px) {
   /* Mobile: keep just the random excerpt + the book stack.
      Hide everything secondary so the page reads like a single column. */
-  .dokki-repo-link,
+  .dokki-footer,
   .dokki-controls,
-  .dokki-graph-wrap {
+  .dokki-graph-section {
     display: none;
   }
 
-  /* Spine: tighter gap; show only the author (drop publisher + separator). */
-  .dokki-spine-inner { gap: 10px; }
+  /* Spine: 2 columns — title (fills) · author (right). Status text and
+     publisher hidden; the left-border color still carries reading status. */
+  .dokki-spine-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+  .dokki-spine-status,
   .dokki-spine-sep,
   .dokki-spine-publisher {
     display: none;
+  }
+  .dokki-spine-meta {
+    justify-self: end;
+    text-align: right;
   }
 }
 
