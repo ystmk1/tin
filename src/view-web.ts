@@ -3,16 +3,24 @@ import { renderGraph, type GraphHandle } from "./graphView";
 import { renderBookStack } from "./bookStack";
 import { tagLeafOf } from "./parser-core";
 import { searchBooks, NlBookResult } from "./nl-api";
-import { getMetadata, setMetadata, clearMetadata, initMetadata } from "./note-metadata";
+import { getMetadata, setMetadata, clearMetadata } from "./note-metadata";
 import { isCloudEnabled } from "./supabase";
-import { onAuthChange, signInWith, signOut, userLabel, getUser } from "./auth";
+import { signInWith, signOut, userLabel, getUser } from "./auth";
 
 export interface WebViewOptions {
   books: BookNote[];
+  isDemo: boolean;
   mount: HTMLElement;
+  /** Persist uploaded files (main re-loads + calls reload afterwards). */
+  onUpload: (files: File[]) => Promise<void>;
 }
 
-export function mountWebView({ books, mount }: WebViewOptions): void {
+export interface WebViewHandle {
+  /** Swap the book set (after auth change or upload) and re-render. */
+  reload: (books: BookNote[], isDemo: boolean) => void;
+}
+
+export function mountWebView({ books, isDemo, mount, onUpload }: WebViewOptions): WebViewHandle {
   const state = {
     filterAuthors: new Set<string>(),
     filterTags: new Set<string>(),
@@ -22,6 +30,7 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
   };
   let graph: GraphHandle | null = null;
   let lastOpenedBook: BookNote | null = null;
+  let controlsEl: HTMLElement | null = null;
 
   mount.classList.add("dokki-root");
   mount.innerHTML = "";
@@ -44,44 +53,21 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
   repoLink.rel = "noopener";
   repoLink.textContent = "GitHub →";
   headerRight.appendChild(repoLink);
+  const uploadSlot = document.createElement("div");
+  uploadSlot.className = "dokki-upload-slot";
+  headerRight.appendChild(uploadSlot);
   const authSlot = document.createElement("div");
   authSlot.className = "dokki-auth";
   headerRight.appendChild(authSlot);
   header.appendChild(headerRight);
   mount.appendChild(header);
 
-  // Auth control reflects cloud sync state. When cloud is disabled
-  // (Supabase env not set), the slot stays empty and everything runs
-  // off localStorage exactly as before.
-  if (isCloudEnabled) {
-    onAuthChange((user) => {
-      renderAuthSlot(authSlot);
-      // Reload metadata for the new identity, then refresh anything
-      // currently on screen that depends on it.
-      void initMetadata().then(() => {
-        if (panel.classList.contains("is-open") && lastOpenedBook) {
-          renderHead(
-            panel.querySelector(".dokki-panel-head") as HTMLElement,
-            lastOpenedBook,
-          );
-        }
-      });
-      void user;
-    });
-  }
-
   const excerptWrap = document.createElement("div");
   excerptWrap.className = "dokki-excerpt";
   mount.appendChild(excerptWrap);
-  renderExcerpt(excerptWrap, books, (b) => openNote(b));
 
-  const controls = renderControls(state, books, {
-    onSearchOrFilter: () => {
-      renderStack();
-      updateGraphHighlight();
-    },
-  });
-  mount.appendChild(controls);
+  const controlsHolder = document.createElement("div");
+  mount.appendChild(controlsHolder);
 
   const graphWrap = document.createElement("div");
   graphWrap.className = "dokki-graph-wrap";
@@ -482,8 +468,21 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
     });
   }
 
-  function renderAuthSlot(slot: HTMLElement) {
-    slot.innerHTML = "";
+  function renderControlsBar() {
+    const next = renderControls(state, books, {
+      onSearchOrFilter: () => {
+        renderStack();
+        updateGraphHighlight();
+      },
+    });
+    if (controlsEl) controlsEl.replaceWith(next);
+    else controlsHolder.appendChild(next);
+    controlsEl = next;
+  }
+
+  function renderAuthSlot() {
+    authSlot.innerHTML = "";
+    if (!isCloudEnabled) return; // localStorage-only mode: no auth UI
     const user = getUser();
     if (user) {
       const name = document.createElement("span");
@@ -493,7 +492,7 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
       out.className = "dokki-auth-btn";
       out.textContent = "로그아웃";
       out.addEventListener("click", () => void signOut());
-      slot.append(name, out);
+      authSlot.append(name, out);
       return;
     }
     const wrap = document.createElement("div");
@@ -520,11 +519,87 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
       if (!wrap.contains(e.target as Node)) menu.classList.remove("is-open");
     });
     wrap.append(trigger, menu);
-    slot.appendChild(wrap);
+    authSlot.appendChild(wrap);
   }
 
-  renderGraphSection();
-  renderStack();
+  function renderUploadSlot() {
+    uploadSlot.innerHTML = "";
+    // Uploads need an account. Only show when signed in.
+    if (!isCloudEnabled || !getUser()) return;
+    const btn = document.createElement("button");
+    btn.className = "dokki-auth-btn";
+    btn.textContent = "노트 올리기";
+    const picker = document.createElement("input");
+    picker.type = "file";
+    picker.accept = ".md,text/markdown";
+    picker.multiple = true;
+    picker.style.display = "none";
+    picker.addEventListener("change", () => {
+      if (picker.files && picker.files.length) void doUpload(Array.from(picker.files));
+      picker.value = "";
+    });
+    btn.addEventListener("click", () => picker.click());
+    uploadSlot.append(btn, picker);
+  }
+
+  async function doUpload(files: File[]) {
+    try {
+      await onUpload(files);
+    } catch (e) {
+      alert(`업로드 실패: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  // Whole-app drag & drop (signed-in only).
+  const dropOverlay = document.createElement("div");
+  dropOverlay.className = "dokki-drop-overlay";
+  dropOverlay.textContent = "여기에 .md 파일을 놓으세요";
+  mount.appendChild(dropOverlay);
+  let dragDepth = 0;
+  const canUpload = () => isCloudEnabled && !!getUser();
+  mount.addEventListener("dragenter", (e) => {
+    if (!canUpload()) return;
+    e.preventDefault();
+    dragDepth++;
+    dropOverlay.classList.add("is-active");
+  });
+  mount.addEventListener("dragover", (e) => {
+    if (canUpload()) e.preventDefault();
+  });
+  mount.addEventListener("dragleave", () => {
+    if (!canUpload()) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) dropOverlay.classList.remove("is-active");
+  });
+  mount.addEventListener("drop", (e) => {
+    if (!canUpload()) return;
+    e.preventDefault();
+    dragDepth = 0;
+    dropOverlay.classList.remove("is-active");
+    const files = e.dataTransfer?.files;
+    if (files && files.length) void doUpload(Array.from(files));
+  });
+
+  function renderAll() {
+    mount.classList.toggle("dokki-demo", isDemo);
+    renderExcerpt(excerptWrap, books, (b) => openNote(b));
+    renderControlsBar();
+    renderGraphSection();
+    renderStack();
+    renderAuthSlot();
+    renderUploadSlot();
+  }
+
+  renderAll();
+
+  return {
+    reload(nextBooks: BookNote[], nextIsDemo: boolean) {
+      books = nextBooks;
+      isDemo = nextIsDemo;
+      closePanel();
+      renderAll();
+    },
+  };
 }
 
 function hasActiveFilter(state: ControlsState): boolean {

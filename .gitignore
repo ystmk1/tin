@@ -2,6 +2,10 @@
 node_modules/
 plugin/node_modules/
 
+# personal reading notes — now stored per-account in Supabase, not in git.
+# Kept locally so they can be uploaded through the web UI.
+notes/
+
 # editor / OS
 .DS_Store
 Thumbs.db

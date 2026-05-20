@@ -199,6 +199,32 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 .dokki-auth-provider:hover { background: var(--background-secondary); }
 
+.dokki-upload-slot { display: inline-flex; }
+
+/* Drag & drop overlay for uploading .md notes */
+.dokki-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  letter-spacing: -0.01em;
+  pointer-events: none;
+}
+.dokki-drop-overlay.is-active { display: flex; }
+.dokki-drop-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 18px;
+  border: 2px dashed rgba(255, 255, 255, 0.7);
+  border-radius: 14px;
+}
+
 /* === EXCERPT === */
 .dokki-excerpt {
   position: relative;

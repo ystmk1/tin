@@ -57,6 +57,37 @@ create policy "own rows - delete" on public.note_selections
 
 RLS 덕분에 각 사용자는 **자기 행만** 읽고 쓸 수 있습니다 (멀티유저 안전).
 
+### 노트 본문 테이블 (`notes`)
+
+발췌 노트 .md 파일을 계정에 저장하기 위한 테이블입니다. 같은 SQL Editor에 이어서 Run:
+
+```sql
+create table public.notes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
+  filename text not null,
+  content text not null,
+  updated_at timestamptz not null default now(),
+  unique (user_id, filename)
+);
+
+alter table public.notes enable row level security;
+
+create policy "own notes - select" on public.notes
+  for select using (auth.uid() = user_id);
+
+create policy "own notes - insert" on public.notes
+  for insert with check (auth.uid() = user_id);
+
+create policy "own notes - update" on public.notes
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "own notes - delete" on public.notes
+  for delete using (auth.uid() = user_id);
+```
+
+로그인하면 본인이 올린 .md가 보이고, 로그아웃 상태(또는 노트 0개)면 양식 설명용 데모 노트가 보입니다.
+
 ## 3. 로그인 제공자 설정
 
 좌측 **Authentication → Sign In / Providers** (또는 **URL Configuration**).
