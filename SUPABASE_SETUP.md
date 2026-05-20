@@ -19,42 +19,40 @@
 
 좌측 **SQL Editor → New query** 에 아래를 붙여넣고 **Run**:
 
+> ⚠️ 컬럼 정렬용 공백을 넣지 마세요. 붙여넣을 때 특수 공백문자가 섞이면
+> `syntax error at or near " "` 가 납니다. 아래는 일반 공백만 쓴 버전입니다.
+
 ```sql
 create table public.note_selections (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid not null references auth.users(id) on delete cascade default auth.uid(),
-  note_path   text not null,
-  control_no  text,
-  title       text,
-  author      text,
-  publisher   text,
-  pub_year    text,
-  isbn        text,
-  cover_url   text,
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
+  note_path text not null,
+  control_no text,
+  title text,
+  author text,
+  publisher text,
+  pub_year text,
+  isbn text,
+  cover_url text,
   detail_link text,
-  source      text,
-  updated_at  timestamptz not null default now(),
+  source text,
+  updated_at timestamptz not null default now(),
   unique (user_id, note_path)
 );
 
 alter table public.note_selections enable row level security;
 
-create policy "own rows - select"
-  on public.note_selections for select
-  using (auth.uid() = user_id);
+create policy "own rows - select" on public.note_selections
+  for select using (auth.uid() = user_id);
 
-create policy "own rows - insert"
-  on public.note_selections for insert
-  with check (auth.uid() = user_id);
+create policy "own rows - insert" on public.note_selections
+  for insert with check (auth.uid() = user_id);
 
-create policy "own rows - update"
-  on public.note_selections for update
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+create policy "own rows - update" on public.note_selections
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-create policy "own rows - delete"
-  on public.note_selections for delete
-  using (auth.uid() = user_id);
+create policy "own rows - delete" on public.note_selections
+  for delete using (auth.uid() = user_id);
 ```
 
 RLS 덕분에 각 사용자는 **자기 행만** 읽고 쓸 수 있습니다 (멀티유저 안전).
