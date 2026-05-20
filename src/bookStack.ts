@@ -1,9 +1,17 @@
 import { BookNote } from "./types";
 
+export interface BookStackOpts {
+  /** Right-click a spine → context menu (filePath + cursor position). */
+  onContextMenu?: (filePath: string, x: number, y: number) => void;
+  /** Cover-derived tint ("r,g,b") to wash the spine background, very lightly. */
+  tintFor?: (filePath: string) => string | undefined;
+}
+
 export function renderBookStack(
   container: HTMLElement,
   books: BookNote[],
   onOpen: (path: string) => void,
+  opts?: BookStackOpts,
 ) {
   const list = container.createDiv({ cls: "dokki-stack" });
   if (!books.length) {
@@ -17,6 +25,11 @@ export function renderBookStack(
   for (const b of sorted) {
     const row = list.createDiv({ cls: "dokki-spine" });
     row.dataset.status = b.status;
+    const tint = opts?.tintFor?.(b.filePath);
+    if (tint) {
+      row.addClass("dokki-spine-tinted");
+      row.style.setProperty("--spine-tint", tint);
+    }
     const inner = row.createDiv({ cls: "dokki-spine-inner" });
     inner.createDiv({ cls: "dokki-spine-title", text: b.title });
     const meta = inner.createDiv({ cls: "dokki-spine-meta" });
@@ -35,6 +48,12 @@ export function renderBookStack(
     const status = inner.createDiv({ cls: "dokki-spine-status" });
     status.setText(statusLabel(b));
     row.addEventListener("click", () => onOpen(b.filePath));
+    if (opts?.onContextMenu) {
+      row.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        opts.onContextMenu!(b.filePath, e.clientX, e.clientY);
+      });
+    }
   }
 }
 

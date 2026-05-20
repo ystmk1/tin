@@ -3,9 +3,10 @@ import { renderGraph, type GraphHandle } from "./graphView";
 import { renderBookStack } from "./bookStack";
 import { tagLeafOf } from "./parser-core";
 import { searchBooks, NlBookResult } from "./nl-api";
-import { getMetadata, setMetadata, clearMetadata } from "./note-metadata";
+import { getMetadata, setMetadata, clearMetadata, setCoverColor } from "./note-metadata";
 import { isCloudEnabled } from "./supabase";
 import { signInWith, signOut, userLabel, getUser } from "./auth";
+import { extractCoverColor } from "./cover-color";
 
 export interface WebViewOptions {
   books: BookNote[];
@@ -15,7 +16,9 @@ export interface WebViewOptions {
   onUpload: (files: File[]) => Promise<void>;
   /** Delete an uploaded note by filename (main re-loads afterwards). */
   onDelete: (filename: string) => Promise<void>;
-  /** True for demo/built-in notes (not deletable). */
+  /** Save edited tags for an uploaded note (main rewrites + re-loads). */
+  onEditTags: (filename: string, tags: string[]) => Promise<void>;
+  /** True for demo/built-in notes (not deletable/editable). */
   isDemoPath: (filePath: string) => boolean;
 }
 
@@ -30,6 +33,7 @@ export function mountWebView({
   mount,
   onUpload,
   onDelete,
+  onEditTags,
   isDemoPath,
 }: WebViewOptions): WebViewHandle {
   const state = {
@@ -118,25 +122,7 @@ export function mountWebView({
     close.addEventListener("click", () => closePanel());
     inner.appendChild(close);
 
-    // Delete is available only for the user's own uploaded notes
-    // (signed in, cloud enabled, not a built-in demo note).
-    if (isCloudEnabled && getUser() && !isDemoPath(b.filePath)) {
-      const del = document.createElement("button");
-      del.className = "dokki-panel-delete";
-      del.textContent = "노트 삭제";
-      del.addEventListener("click", async () => {
-        if (!confirm(`"${b.title}" 노트를 삭제할까요? 되돌릴 수 없습니다.`)) return;
-        del.disabled = true;
-        try {
-          await onDelete(b.filePath);
-          closePanel();
-        } catch (e) {
-          del.disabled = false;
-          alert(`삭제 실패: ${e instanceof Error ? e.message : String(e)}`);
-        }
-      });
-      inner.appendChild(del);
-    }
+    // (Delete / edit-tags moved to the book-stack right-click context menu.)
 
     const head = document.createElement("div");
     head.className = "dokki-panel-head";
@@ -469,11 +455,19 @@ export function mountWebView({
       card.appendChild(text);
 
       card.addEventListener("click", () => {
-        setMetadata(note.filePath, r);
+        const meta = setMetadata(note.filePath, r);
         overlay.remove();
         const inner = panel.querySelector(".dokki-panel-inner") as HTMLElement;
         const head = inner.querySelector(".dokki-panel-head") as HTMLElement;
         if (head) renderHead(head, note);
+        // Sample a spine tint from the cover once, then cache + re-render stack.
+        if (r.coverUrl && !meta.coverColor) {
+          void extractCoverColor(r.coverUrl).then((color) => {
+            if (!color) return;
+            setCoverColor(note.filePath, color);
+            renderStack();
+          });
+        }
       });
       return card;
     }
@@ -506,10 +500,74 @@ export function mountWebView({
 
   function renderStack() {
     stackWrap.innerHTML = "";
-    renderBookStack(stackWrap, filtered(state, books), (path) => {
-      const b = books.find((x) => x.filePath === path);
-      if (b) openNote(b);
+    renderBookStack(
+      stackWrap,
+      filtered(state, books),
+      (path) => {
+        const b = books.find((x) => x.filePath === path);
+        if (b) openNote(b);
+      },
+      {
+        tintFor: (path) => getMetadata(path)?.coverColor,
+        onContextMenu: (path, x, y) => {
+          const b = books.find((x2) => x2.filePath === path);
+          if (b) openSpineMenu(b, x, y);
+        },
+      },
+    );
+  }
+
+  function openSpineMenu(b: BookNote, x: number, y: number) {
+    // Edit/delete only for the user's own uploaded notes.
+    if (!isCloudEnabled || !getUser() || isDemoPath(b.filePath)) return;
+
+    document.querySelector(".dokki-ctx-menu")?.remove();
+    const menu = document.createElement("div");
+    menu.className = "dokki-ctx-menu";
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "dokki-ctx-item";
+    editBtn.textContent = "태그 수정하기";
+    editBtn.addEventListener("click", async () => {
+      menu.remove();
+      const current = b.frontmatter.tags.join("/");
+      const input = window.prompt("태그 (/ 또는 , 로 구분)", current);
+      if (input === null) return;
+      const edited = input.split(/[/,]/).map((s) => s.trim()).filter(Boolean);
+      const rating = b.frontmatter.rating;
+      const tags = [...(rating ? ["☆".repeat(rating)] : []), ...edited];
+      try {
+        await onEditTags(b.filePath, tags);
+      } catch (e) {
+        alert(`태그 수정 실패: ${e instanceof Error ? e.message : String(e)}`);
+      }
     });
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "dokki-ctx-item dokki-ctx-danger";
+    delBtn.textContent = "삭제하기";
+    delBtn.addEventListener("click", async () => {
+      menu.remove();
+      if (!confirm(`"${b.title}" 노트를 삭제할까요? 되돌릴 수 없습니다.`)) return;
+      try {
+        await onDelete(b.filePath);
+      } catch (e) {
+        alert(`삭제 실패: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    });
+
+    menu.append(editBtn, delBtn);
+    document.body.appendChild(menu);
+
+    const close = (e: MouseEvent) => {
+      if (!menu.contains(e.target as Node)) {
+        menu.remove();
+        document.removeEventListener("mousedown", close);
+      }
+    };
+    setTimeout(() => document.addEventListener("mousedown", close), 0);
   }
 
   function renderControlsBar() {

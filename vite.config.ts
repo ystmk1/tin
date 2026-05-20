@@ -26,6 +26,29 @@ function bookSearchDevPlugin(nlKey: string | undefined, aladinKey: string | unde
           return send(502, { error: e instanceof Error ? e.message : String(e) });
         }
       });
+
+      // Cover image proxy (CORS) so the client can sample pixels in dev too.
+      const ALLOWED = /(^|\.)aladin\.co\.kr$|(^|\.)nl\.go\.kr$/i;
+      server.middlewares.use("/api/img-proxy", async (req, res) => {
+        try {
+          const u = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+          const target = u.searchParams.get("url") ?? "";
+          const parsed = new URL(target);
+          if (!ALLOWED.test(parsed.host)) {
+            res.statusCode = 403;
+            return res.end("host not allowed");
+          }
+          const r = await fetch(parsed.toString());
+          const buf = Buffer.from(await r.arrayBuffer());
+          res.statusCode = r.status;
+          res.setHeader("Content-Type", r.headers.get("content-type") ?? "image/jpeg");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.end(buf);
+        } catch (e) {
+          res.statusCode = 502;
+          res.end(e instanceof Error ? e.message : "fetch failed");
+        }
+      });
     },
   };
 }

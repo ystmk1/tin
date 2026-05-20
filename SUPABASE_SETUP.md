@@ -34,6 +34,7 @@ create table public.note_selections (
   pub_year text,
   isbn text,
   cover_url text,
+  cover_color text,
   detail_link text,
   source text,
   updated_at timestamptz not null default now(),
@@ -56,6 +57,11 @@ create policy "own rows - delete" on public.note_selections
 ```
 
 RLS 덕분에 각 사용자는 **자기 행만** 읽고 쓸 수 있습니다 (멀티유저 안전).
+
+> 이미 `note_selections` 테이블을 만든 적이 있다면, 표지 색상 캐시용 컬럼만 추가:
+> ```sql
+> alter table public.note_selections add column if not exists cover_color text;
+> ```
 
 ### 노트 본문 테이블 (`notes`)
 

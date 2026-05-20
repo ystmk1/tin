@@ -3,7 +3,15 @@ import "./styles.css";
 import { mountWebView, type WebViewHandle } from "./view-web";
 import { initAuth, onAuthChange } from "./auth";
 import { initMetadata } from "./note-metadata";
-import { loadBooks, uploadNotes, deleteNote, isDemoPath } from "./notes-store";
+import {
+  loadBooks,
+  uploadNotes,
+  deleteNote,
+  isDemoPath,
+  getNoteRaw,
+  saveNoteContent,
+  rewriteTags,
+} from "./notes-store";
 
 const app = document.getElementById("app");
 if (!app) throw new Error("#app not found");
@@ -23,6 +31,7 @@ async function bootstrap() {
     mount: app!,
     onUpload: handleUpload,
     onDelete: handleDelete,
+    onEditTags: handleEditTags,
     isDemoPath,
   });
   dismissSplash();
@@ -46,6 +55,13 @@ async function handleUpload(files: File[]) {
 
 async function handleDelete(filename: string) {
   await deleteNote(filename);
+  await refresh();
+}
+
+async function handleEditTags(filename: string, tags: string[]) {
+  const raw = await getNoteRaw(filename);
+  if (raw == null) throw new Error("노트 원문을 찾을 수 없습니다.");
+  await saveNoteContent(filename, rewriteTags(raw, tags));
   await refresh();
 }
 

@@ -136,6 +136,35 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 .dokki-repo-link:hover { color: var(--text-normal); }
 
+/* Right-click context menu on a book spine. */
+.dokki-ctx-menu {
+  position: fixed;
+  z-index: 70;
+  min-width: 140px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: var(--font-ui);
+}
+.dokki-ctx-item {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 0.82rem;
+  color: var(--text-normal);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dokki-ctx-item:hover { background: var(--background-secondary); }
+.dokki-ctx-danger:hover { color: hsl(0, 65%, 55%); }
+
 /* Footer — GitHub link at the very bottom (desktop only; hidden on mobile). */
 .dokki-footer {
   margin-top: 28px;
@@ -531,11 +560,30 @@ html.dokki-no-splash #dokki-splash { display: none; }
       transparent 60%
     );
 }
-/* Left status band: 완독 black solid · 중단 gray solid · 읽는 중 light dashed. */
+/* Left status band: 완독 black solid · 중단 light-gray solid · 읽는 중 light dashed. */
 .dokki-spine[data-status="finished"] { --spine-color: var(--text-normal); }
-.dokki-spine[data-status="stopped"]  { --spine-color: var(--text-muted); }
+.dokki-spine[data-status="stopped"]  { --spine-color: var(--text-faint); }
 .dokki-spine[data-status="reading"]  { --spine-color: var(--text-faint); border-left-style: dashed; }
 .dokki-spine[data-status="unknown"]  { --spine-color: var(--background-modifier-border); }
+
+/* Cover-derived tint — very light wash from the book cover's average color.
+   --spine-tint is "r,g,b". Replaces the neutral gradient for linked books. */
+.dokki-spine-tinted {
+  background: linear-gradient(
+    to right,
+    rgba(var(--spine-tint), 0.13),
+    rgba(var(--spine-tint), 0.03) 60%,
+    transparent
+  );
+}
+.dokki-spine-tinted:hover {
+  background: linear-gradient(
+    to right,
+    rgba(var(--spine-tint), 0.20),
+    rgba(var(--spine-tint), 0.05) 70%,
+    transparent
+  );
+}
 
 /* Desktop: title (left) · author/publisher (middle) · status+date (right).
    All tracks are fr-based so the author column stays put regardless of how

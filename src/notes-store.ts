@@ -76,6 +76,52 @@ export function isDemoPath(filePath: string): boolean {
   return filePath.startsWith("demo/");
 }
 
+/** Fetch the raw .md content of one uploaded note. */
+export async function getNoteRaw(filename: string): Promise<string | null> {
+  const user = getUser();
+  if (!supabase || !user) return null;
+  const { data, error } = await supabase
+    .from("notes")
+    .select("content")
+    .eq("user_id", user.id)
+    .eq("filename", filename)
+    .maybeSingle();
+  if (error || !data) return null;
+  return (data.content as string) ?? null;
+}
+
+/** Overwrite one uploaded note's content. */
+export async function saveNoteContent(filename: string, content: string): Promise<void> {
+  const user = getUser();
+  if (!supabase || !user) throw new Error("로그인이 필요합니다.");
+  const { error } = await supabase
+    .from("notes")
+    .upsert({ user_id: user.id, filename, content }, { onConflict: "user_id,filename" });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Replace just the `tags:` block of a note's YAML frontmatter, leaving every
+ * other field byte-identical (avoids js-yaml reformatting dates etc.).
+ */
+export function rewriteTags(content: string, tags: string[]): string {
+  if (!content.startsWith("---")) return content;
+  const end = content.indexOf("\n---", 3);
+  if (end < 0) return content;
+  const fm = content.slice(3, end); // starts with "\n", ends before closing ---
+  const rest = content.slice(end); // "\n---" + body
+
+  const block = "tags:\n" + tags.map((t) => `  - ${t}`).join("\n") + "\n";
+  const TAGS_BLOCK = /(^|\n)tags:[^\n]*\n(?:[ \t]+-[^\n]*\n?)*/;
+  let newFm: string;
+  if (TAGS_BLOCK.test(fm)) {
+    newFm = fm.replace(TAGS_BLOCK, (_m, p1: string) => `${p1}${block}`);
+  } else {
+    newFm = fm.replace(/\n*$/, "\n") + block;
+  }
+  return "---" + newFm + rest;
+}
+
 function safeParse(filename: string, content: string): BookNote | null {
   try {
     const title = filename.replace(/\.md$/i, "");

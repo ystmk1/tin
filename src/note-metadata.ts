@@ -24,6 +24,7 @@ export interface NoteMetadata {
   pubYear?: string;
   isbn?: string;
   coverUrl?: string;
+  coverColor?: string; // "r,g,b" sampled from the cover, cached (computed once)
   detailLink?: string;
   source?: string;
   selectedAt: string; // ISO date
@@ -62,6 +63,15 @@ export function clearMetadata(filePath: string): void {
   delete cache[filePath];
   writeLocal(cache);
   void deleteCloud(filePath);
+}
+
+/** Cache the cover-derived tint color once and persist it. */
+export function setCoverColor(filePath: string, color: string): void {
+  const meta = cache[filePath];
+  if (!meta) return;
+  meta.coverColor = color;
+  writeLocal(cache);
+  void persistCloud(filePath, meta);
 }
 
 // ---------- lifecycle ----------
@@ -144,6 +154,7 @@ interface Row {
   pub_year: string | null;
   isbn: string | null;
   cover_url: string | null;
+  cover_color: string | null;
   detail_link: string | null;
   source: string | null;
   updated_at?: string | null;
@@ -158,6 +169,7 @@ function rowToMeta(row: Row): NoteMetadata {
     pubYear: row.pub_year ?? undefined,
     isbn: row.isbn ?? undefined,
     coverUrl: row.cover_url ?? undefined,
+    coverColor: row.cover_color ?? undefined,
     detailLink: row.detail_link ?? undefined,
     source: row.source ?? undefined,
     selectedAt: row.updated_at ?? new Date().toISOString(),
@@ -173,6 +185,7 @@ function metaToRow(meta: NoteMetadata): Omit<Row, "note_path"> {
     pub_year: meta.pubYear ?? null,
     isbn: meta.isbn ?? null,
     cover_url: meta.coverUrl ?? null,
+    cover_color: meta.coverColor ?? null,
     detail_link: meta.detailLink ?? null,
     source: meta.source ?? null,
   };
