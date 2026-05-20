@@ -13,6 +13,10 @@ export interface WebViewOptions {
   mount: HTMLElement;
   /** Persist uploaded files (main re-loads + calls reload afterwards). */
   onUpload: (files: File[]) => Promise<void>;
+  /** Delete an uploaded note by filename (main re-loads afterwards). */
+  onDelete: (filename: string) => Promise<void>;
+  /** True for demo/built-in notes (not deletable). */
+  isDemoPath: (filePath: string) => boolean;
 }
 
 export interface WebViewHandle {
@@ -20,7 +24,14 @@ export interface WebViewHandle {
   reload: (books: BookNote[], isDemo: boolean) => void;
 }
 
-export function mountWebView({ books, isDemo, mount, onUpload }: WebViewOptions): WebViewHandle {
+export function mountWebView({
+  books,
+  isDemo,
+  mount,
+  onUpload,
+  onDelete,
+  isDemoPath,
+}: WebViewOptions): WebViewHandle {
   const state = {
     filterAuthors: new Set<string>(),
     filterTags: new Set<string>(),
@@ -95,6 +106,26 @@ export function mountWebView({ books, isDemo, mount, onUpload }: WebViewOptions)
     close.textContent = "×";
     close.addEventListener("click", () => closePanel());
     inner.appendChild(close);
+
+    // Delete is available only for the user's own uploaded notes
+    // (signed in, cloud enabled, not a built-in demo note).
+    if (isCloudEnabled && getUser() && !isDemoPath(b.filePath)) {
+      const del = document.createElement("button");
+      del.className = "dokki-panel-delete";
+      del.textContent = "노트 삭제";
+      del.addEventListener("click", async () => {
+        if (!confirm(`"${b.title}" 노트를 삭제할까요? 되돌릴 수 없습니다.`)) return;
+        del.disabled = true;
+        try {
+          await onDelete(b.filePath);
+          closePanel();
+        } catch (e) {
+          del.disabled = false;
+          alert(`삭제 실패: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      });
+      inner.appendChild(del);
+    }
 
     const head = document.createElement("div");
     head.className = "dokki-panel-head";

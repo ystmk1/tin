@@ -3,7 +3,7 @@ import "./styles.css";
 import { mountWebView, type WebViewHandle } from "./view-web";
 import { initAuth, onAuthChange } from "./auth";
 import { initMetadata } from "./note-metadata";
-import { loadBooks, uploadNotes } from "./notes-store";
+import { loadBooks, uploadNotes, deleteNote, isDemoPath } from "./notes-store";
 
 const app = document.getElementById("app");
 if (!app) throw new Error("#app not found");
@@ -22,6 +22,8 @@ async function bootstrap() {
     isDemo: initial.isDemo,
     mount: app!,
     onUpload: handleUpload,
+    onDelete: handleDelete,
+    isDemoPath,
   });
   dismissSplash();
 
@@ -39,6 +41,11 @@ async function refresh() {
 
 async function handleUpload(files: File[]) {
   await uploadNotes(files);
+  await refresh();
+}
+
+async function handleDelete(filename: string) {
+  await deleteNote(filename);
   await refresh();
 }
 

@@ -29,10 +29,9 @@ export function renderBookStack(
       }
       meta.createSpan({ cls: "dokki-spine-publisher", text: b.frontmatter.publisher });
     }
-    const status = inner.createDiv({ cls: "dokki-spine-status" });
-    status.setText(statusLabel(b));
+    // Reading status is conveyed by the spine's color (via data-status in CSS),
+    // not a variable-width text column — that kept the author column aligned.
     row.addEventListener("click", () => onOpen(b.filePath));
-    row.style.setProperty("--spine-hue", String(hueFor(b)));
   }
 }
 
@@ -51,22 +50,3 @@ function parseDate(s?: string): Date | null {
   return null;
 }
 
-function statusLabel(b: BookNote): string {
-  switch (b.status) {
-    case "reading":
-      return "읽는 중";
-    case "stopped":
-      return b.frontmatter.stoppedAtPage ? `p.${b.frontmatter.stoppedAtPage} 중단` : "중단";
-    case "finished":
-      return b.frontmatter.endDate ? `완독 · ${b.frontmatter.endDate}` : "완독";
-    default:
-      return b.frontmatter.rawStatus ?? "";
-  }
-}
-
-function hueFor(b: BookNote): number {
-  // deterministic hue based on title for spine color variation
-  let h = 0;
-  for (let i = 0; i < b.title.length; i++) h = (h * 31 + b.title.charCodeAt(i)) >>> 0;
-  return h % 360;
-}

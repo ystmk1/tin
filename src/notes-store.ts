@@ -59,6 +59,23 @@ export async function uploadNotes(files: File[]): Promise<{ saved: number; skipp
   return { saved, skipped: files.length - mds.length };
 }
 
+/** Delete one uploaded note (by its filename) from the signed-in account. */
+export async function deleteNote(filename: string): Promise<void> {
+  const user = getUser();
+  if (!supabase || !user) throw new Error("로그인이 필요합니다.");
+  const { error } = await supabase
+    .from("notes")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("filename", filename);
+  if (error) throw new Error(error.message);
+}
+
+/** A note is deletable only if it's a real uploaded note (not a demo one). */
+export function isDemoPath(filePath: string): boolean {
+  return filePath.startsWith("demo/");
+}
+
 function safeParse(filename: string, content: string): BookNote | null {
   try {
     const title = filename.replace(/\.md$/i, "");
