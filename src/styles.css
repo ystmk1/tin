@@ -419,7 +419,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 2px 4px 10px;
+  padding: 2px 4px 16px;
   border-bottom: 1px solid var(--background-modifier-border);
 }
 .dokki-filter-popover-head > span {
@@ -440,7 +440,11 @@ html.dokki-no-splash #dokki-splash { display: none; }
   border-radius: 4px;
 }
 .dokki-filter-clear:hover { color: var(--text-normal); background: var(--background-secondary); }
-.dokki-filter-section { padding: 12px 4px 4px; }
+/* Roomier sections: generous breathing room around each dashed divider and
+   between a section's label and its chips. */
+.dokki-filter-section { padding: 20px 4px 18px; }
+.dokki-filter-section:first-of-type { padding-top: 16px; }
+.dokki-filter-section:last-of-type { padding-bottom: 4px; }
 .dokki-filter-section + .dokki-filter-section {
   border-top: 1px dashed var(--background-modifier-border);
 }
@@ -450,13 +454,13 @@ html.dokki-no-splash #dokki-splash { display: none; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-faint);
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   font-weight: 600;
 }
 .dokki-filter-section-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 7px;
 }
 .dokki-filter-chip {
   background: transparent;

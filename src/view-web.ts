@@ -1,4 +1,4 @@
-import { BookNote } from "./types";
+import { BookNote, GraphBasis } from "./types";
 import { renderGraph, type GraphHandle } from "./graphView";
 import { renderBookStack } from "./bookStack";
 import { tagLeafOf } from "./parser-core";
@@ -36,12 +36,13 @@ export function mountWebView({
   onEditTags,
   isDemoPath,
 }: WebViewOptions): WebViewHandle {
-  const state = {
+  const state: ControlsState = {
     filterAuthors: new Set<string>(),
     filterTags: new Set<string>(),
     filterStatuses: new Set<string>(),
     filterRatings: new Set<string>(),
     search: "",
+    graphBasis: "off",
   };
   let graph: GraphHandle | null = null;
   let lastOpenedBook: BookNote | null = null;
@@ -482,10 +483,15 @@ export function mountWebView({
   function renderGraphSection() {
     graph?.cleanup();
     graphWrap.innerHTML = "";
-    graph = renderGraph(graphWrap, books, (path) => {
-      const b = books.find((x) => x.filePath === path);
-      if (b) openNote(b);
-    });
+    graph = renderGraph(
+      graphWrap,
+      books,
+      (path) => {
+        const b = books.find((x) => x.filePath === path);
+        if (b) openNote(b);
+      },
+      state.graphBasis,
+    );
     updateGraphHighlight();
   }
 
@@ -576,6 +582,9 @@ export function mountWebView({
       onSearchOrFilter: () => {
         renderStack();
         updateGraphHighlight();
+      },
+      onGraphBasisChange: () => {
+        renderGraphSection();
       },
     });
     if (controlsEl) controlsEl.replaceWith(next);
@@ -765,11 +774,22 @@ interface ControlsState {
   filterStatuses: Set<string>;
   filterRatings: Set<string>;
   search: string;
+  graphBasis: GraphBasis;
 }
 
 interface ControlsHooks {
   onSearchOrFilter: () => void;
+  /** Graph connection basis changed → rebuild the graph. */
+  onGraphBasisChange: () => void;
 }
+
+// Single-select chips for the graph connection basis.
+const GRAPH_BASIS_OPTIONS: Array<[GraphBasis, string]> = [
+  ["off", "연결 끄기"],
+  ["author", "저자"],
+  ["tag", "태그"],
+  ["both", "저자+태그"],
+];
 
 const STATUS_OPTIONS: Array<[string, string]> = [
   ["reading", "읽는 중"],
@@ -865,6 +885,16 @@ function renderFilterButton(
     head.appendChild(clear);
     popover.appendChild(head);
 
+    // Graph connection basis (single-select; a view preference, not a filter —
+    // so it sits apart from the badge/초기화).
+    popover.appendChild(
+      buildModeSection("연결", GRAPH_BASIS_OPTIONS, state.graphBasis, (next) => {
+        state.graphBasis = next;
+        buildPopover();
+        hooks.onGraphBasisChange();
+      }),
+    );
+
     const authors = uniqueSorted(books.map((b) => b.frontmatter.author ?? "").filter(Boolean));
     const tagLeaves = uniqueSorted(
       books.flatMap((b) => b.frontmatter.tags.map((t) => tagLeafOf(t))),
@@ -919,6 +949,36 @@ function renderFilterButton(
 
   refreshBadge();
   return root;
+}
+
+// Single-select variant of a filter section: exactly one chip is active.
+function buildModeSection<T extends string>(
+  label: string,
+  options: Array<[T, string]>,
+  active: T,
+  onSelect: (value: T) => void,
+): HTMLElement {
+  const section = document.createElement("div");
+  section.className = "dokki-filter-section";
+  const heading = document.createElement("div");
+  heading.className = "dokki-filter-section-label";
+  heading.textContent = label;
+  section.appendChild(heading);
+  const list = document.createElement("div");
+  list.className = "dokki-filter-section-list";
+  for (const [val, text] of options) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "dokki-filter-chip";
+    if (val === active) chip.classList.add("is-active");
+    chip.textContent = text;
+    chip.addEventListener("click", () => {
+      if (val !== active) onSelect(val);
+    });
+    list.appendChild(chip);
+  }
+  section.appendChild(list);
+  return section;
 }
 
 function buildFilterSection(

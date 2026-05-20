@@ -39,6 +39,9 @@ export interface BoldFragment {
 
 export type GraphLinkBasis = "author" | "tag-leaf";
 
+/** How the graph decides which notes connect. */
+export type GraphBasis = "off" | "author" | "tag" | "both";
+
 export interface GraphNode {
   id: string;
   title: string;

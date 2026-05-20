@@ -1,11 +1,16 @@
-import { BookNote, GraphLink, GraphNode } from "./types";
+import { BookNote, GraphBasis, GraphLink, GraphNode } from "./types";
 import { tagLeafOf } from "./parser-core";
 
 // Build the relationship graph. Two books connect when they share an author
-// OR share a tag-leaf — the same dimensions the filter popover exposes,
-// just combined. The basis-toggle UI is gone (the graph reflects the unified
-// search + filter state instead).
-export function buildGraph(books: BookNote[]): { nodes: GraphNode[]; links: GraphLink[] } {
+// and/or a tag-leaf, depending on `basis`:
+//   "both" (default) — author OR tag-leaf
+//   "author"         — shared author only
+//   "tag"            — shared tag-leaf only
+//   "off"            — no links (isolated stars)
+export function buildGraph(
+  books: BookNote[],
+  basis: GraphBasis = "both",
+): { nodes: GraphNode[]; links: GraphLink[] } {
   const nodes: GraphNode[] = books.map((b) => ({
     id: b.filePath,
     title: b.title,
@@ -18,12 +23,14 @@ export function buildGraph(books: BookNote[]): { nodes: GraphNode[]; links: Grap
   const links: GraphLink[] = [];
   const groups = new Map<string, string[]>();
 
-  for (const b of books) {
-    for (const k of keysFor(b)) {
-      if (!k) continue;
-      const list = groups.get(k) ?? [];
-      list.push(b.filePath);
-      groups.set(k, list);
+  if (basis !== "off") {
+    for (const b of books) {
+      for (const k of keysFor(b, basis)) {
+        if (!k) continue;
+        const list = groups.get(k) ?? [];
+        list.push(b.filePath);
+        groups.set(k, list);
+      }
     }
   }
 
@@ -64,16 +71,18 @@ const GENERIC_TAGS = new Set([
   "안내", "사용법", "속성",
 ]);
 
-function keysFor(b: BookNote): string[] {
+function keysFor(b: BookNote, basis: GraphBasis): string[] {
   const keys: string[] = [];
-  if (b.frontmatter.author) keys.push(`author:${b.frontmatter.author}`);
-  const leaves = new Set<string>();
-  for (const t of b.frontmatter.tags) {
-    const leaf = tagLeafOf(t);
-    if (GENERIC_TAGS.has(leaf)) continue; // skip over-broad tags
-    leaves.add(leaf);
+  if (basis !== "tag" && b.frontmatter.author) keys.push(`author:${b.frontmatter.author}`);
+  if (basis !== "author") {
+    const leaves = new Set<string>();
+    for (const t of b.frontmatter.tags) {
+      const leaf = tagLeafOf(t);
+      if (GENERIC_TAGS.has(leaf)) continue; // skip over-broad tags
+      leaves.add(leaf);
+    }
+    for (const leaf of leaves) keys.push(`tag:${leaf}`);
   }
-  for (const leaf of leaves) keys.push(`tag:${leaf}`);
   return keys;
 }
 

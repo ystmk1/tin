@@ -11,7 +11,7 @@ import {
   SimulationLinkDatum,
 } from "d3-force";
 import * as THREE from "three";
-import { BookNote } from "./types";
+import { BookNote, GraphBasis } from "./types";
 import { buildGraph } from "./graph";
 import { getMetadata } from "./note-metadata";
 
@@ -88,8 +88,9 @@ export function renderGraph(
   container: HTMLElement,
   books: BookNote[],
   onOpen: (path: string) => void,
+  basis: GraphBasis = "both",
 ): GraphHandle {
-  const { nodes: rawNodes, links: rawLinks } = buildGraph(books);
+  const { nodes: rawNodes, links: rawLinks } = buildGraph(books, basis);
 
   let width = container.clientWidth || 800;
   container.style.height = `${HEIGHT}px`;
@@ -116,24 +117,32 @@ export function renderGraph(
   const starColor = (d: SimNode) =>
     (coverStarColor(d.filePath) ?? DEFAULT_STAR.clone()).multiplyScalar(0.88 + 0.12 * heat(d));
 
-  // --- d3-force layout (unchanged behaviour, recentred on the origin) -----
-  const sim: Simulation<SimNode, SimLink> = forceSimulation(nodes)
-    .force(
-      "link",
-      forceLink<SimNode, SimLink>(links)
-        .id((d) => d.id)
-        .distance((l) => {
-          const s = l.source as SimNode;
-          const t = l.target as SimNode;
-          return 48 + 55 / Math.max(1, (s.degree + t.degree) / 2);
-        })
-        .strength(0.32),
-    )
-    .force("charge", forceManyBody().strength((d) => -55 - 55 * heat(d as SimNode)))
-    .force("center", forceCenter(0, 0).strength(0.04))
-    .force("x", forceX(0).strength((d) => 0.02 + 0.18 * ((d as SimNode).degree / maxDeg)))
-    .force("y", forceY(0).strength((d) => 0.04 + 0.25 * ((d as SimNode).degree / maxDeg)))
-    .force("collide", forceCollide<SimNode>((d) => starSize(d as SimNode) * 0.6 + 9));
+  // With connections off the field is a free-floating, slowly rotating
+  // starfield (example-style); with connections on it's a force-directed web
+  // laid out on the z=0 plane (draggable). `rotating` switches between them.
+  const rotating = basis === "off";
+
+  // --- d3-force layout (only when connections are shown) ------------------
+  let sim: Simulation<SimNode, SimLink> | null = null;
+  if (!rotating) {
+    sim = forceSimulation(nodes)
+      .force(
+        "link",
+        forceLink<SimNode, SimLink>(links)
+          .id((d) => d.id)
+          .distance((l) => {
+            const s = l.source as SimNode;
+            const t = l.target as SimNode;
+            return 48 + 55 / Math.max(1, (s.degree + t.degree) / 2);
+          })
+          .strength(0.32),
+      )
+      .force("charge", forceManyBody().strength((d) => -55 - 55 * heat(d as SimNode)))
+      .force("center", forceCenter(0, 0).strength(0.04))
+      .force("x", forceX(0).strength((d) => 0.02 + 0.18 * ((d as SimNode).degree / maxDeg)))
+      .force("y", forceY(0).strength((d) => 0.04 + 0.25 * ((d as SimNode).degree / maxDeg)))
+      .force("collide", forceCollide<SimNode>((d) => starSize(d as SimNode) * 0.6 + 9));
+  }
 
   // --- three.js scene -----------------------------------------------------
   const scene = new THREE.Scene();
@@ -180,6 +189,22 @@ export function renderGraph(
     nodeGroup.add(sp);
     return sp;
   });
+
+  // Off mode: scatter the stars once through a 3D sphere; the whole group
+  // then turns slowly. (Connected mode positions come from the sim each tick.)
+  if (rotating) {
+    const R = 130;
+    for (const sp of sprites) {
+      const r = R * Math.cbrt(Math.random());
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      sp.position.set(
+        r * Math.sin(phi) * Math.cos(theta),
+        r * Math.sin(phi) * Math.sin(theta),
+        r * Math.cos(phi),
+      );
+    }
+  }
 
   // --- hover label (HTML overlay) ----------------------------------------
   const label = document.createElement("div");
@@ -233,6 +258,7 @@ export function renderGraph(
   const hitPoint = new THREE.Vector3();
 
   let dragNode: SimNode | null = null;
+  let tapNode: SimNode | null = null; // pressed node, opens on tap (both modes)
   let panning = false;
   let lastX = 0;
   let lastY = 0;
@@ -268,12 +294,15 @@ export function renderGraph(
     lastY = e.clientY;
     moved = false;
     const hit = pickNode();
-    if (hit) {
+    tapNode = hit ? hit.node : null;
+    if (hit && sim) {
+      // Connected mode: grab the node so the layout follows the cursor.
       dragNode = hit.node;
       dragNode.fx = dragNode.x;
       dragNode.fy = dragNode.y;
       sim.alphaTarget(0.3).restart();
     } else {
+      // Off mode (or empty space): a drag pans the camera; a tap still opens.
       panning = true;
     }
     label.style.display = "none";
@@ -325,14 +354,15 @@ export function renderGraph(
   };
 
   const endPointer = (e: PointerEvent) => {
-    if (dragNode) {
+    if (dragNode && sim) {
       sim.alphaTarget(0);
       dragNode.fx = null;
       dragNode.fy = null;
-      // A tap (no real movement) on a node opens it.
-      if (!moved) onOpen(dragNode.filePath);
       dragNode = null;
     }
+    // A tap (no real movement) on a node opens it — in either mode.
+    if (!moved && tapNode) onOpen(tapNode.filePath);
+    tapNode = null;
     panning = false;
     try {
       renderer.domElement.releasePointerCapture(e.pointerId);
@@ -372,10 +402,20 @@ export function renderGraph(
 
   applyLinkColors();
   let raf = 0;
+  let last = performance.now();
   const tick = () => {
     raf = requestAnimationFrame(tick);
+    const now = performance.now();
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
     camera.lookAt(camera.position.x, camera.position.y, 0);
-    syncPositions();
+    if (rotating) {
+      // Slow drift around two axes for a living starfield (example-style).
+      nodeGroup.rotation.y += dt * 0.06;
+      nodeGroup.rotation.x += dt * 0.018;
+    } else {
+      syncPositions();
+    }
     renderer.render(scene, camera);
   };
   tick();
@@ -391,7 +431,7 @@ export function renderGraph(
   return {
     cleanup: () => {
       cancelAnimationFrame(raf);
-      sim.stop();
+      sim?.stop();
       ro.disconnect();
       cv.removeEventListener("pointerdown", onPointerDown);
       cv.removeEventListener("pointermove", onPointerMove);
