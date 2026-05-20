@@ -757,16 +757,22 @@ html.dokki-no-splash #dokki-splash { display: none; }
     display: none;
   }
 
-  /* Spine row: title left, author right. Status chip and publisher hidden;
-     the colored left border still indicates reading status. */
+  /* Spine row: title left (takes all it can), author right with only a
+     minimal gap. Status chip + publisher hidden; the colored left border
+     still indicates reading status. */
+  .dokki-spine-inner { gap: 8px; }
   .dokki-spine-status { display: none; }
+  .dokki-spine-title {
+    max-width: none;   /* lift the desktop 50% cap */
+    flex: 1 1 auto;    /* grow into the free space, push author to the edge */
+  }
   .dokki-spine-meta {
     display: inline-block;
-    margin-left: auto;
+    margin-left: 0;     /* title's flex-grow handles the spacing now */
     text-align: right;
-    flex: 0 1 auto;
+    flex: 0 1 auto;     /* size to content; shrink (ellipsis) only if huge */
     min-width: 0;
-    max-width: 50%;
+    max-width: 40%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

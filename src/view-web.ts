@@ -17,6 +17,7 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
     filterAuthors: new Set<string>(),
     filterTags: new Set<string>(),
     filterStatuses: new Set<string>(),
+    filterRatings: new Set<string>(),
     search: "",
   };
   let graph: GraphHandle | null = null;
@@ -461,7 +462,8 @@ function hasActiveFilter(state: ControlsState): boolean {
     state.search.trim().length > 0 ||
     state.filterAuthors.size > 0 ||
     state.filterTags.size > 0 ||
-    state.filterStatuses.size > 0
+    state.filterStatuses.size > 0 ||
+    state.filterRatings.size > 0
   );
 }
 
@@ -513,6 +515,7 @@ interface ControlsState {
   filterAuthors: Set<string>;
   filterTags: Set<string>;
   filterStatuses: Set<string>;
+  filterRatings: Set<string>;
   search: string;
 }
 
@@ -575,7 +578,10 @@ function renderFilterButton(
   root.appendChild(popover);
 
   const activeCount = () =>
-    state.filterStatuses.size + state.filterAuthors.size + state.filterTags.size;
+    state.filterStatuses.size +
+    state.filterAuthors.size +
+    state.filterTags.size +
+    state.filterRatings.size;
 
   const refreshBadge = () => {
     const n = activeCount();
@@ -603,6 +609,7 @@ function renderFilterButton(
       state.filterStatuses.clear();
       state.filterAuthors.clear();
       state.filterTags.clear();
+      state.filterRatings.clear();
       buildPopover();
       refreshBadge();
       hooks.onSearchOrFilter();
@@ -614,8 +621,26 @@ function renderFilterButton(
     const tagLeaves = uniqueSorted(
       books.flatMap((b) => b.frontmatter.tags.map((t) => tagLeafOf(t))),
     );
+    // Distinct ratings present in the data, high → low, labeled as filled stars.
+    const ratings = Array.from(
+      new Set(
+        books
+          .map((b) => b.frontmatter.rating)
+          .filter((r): r is number => typeof r === "number" && r > 0),
+      ),
+    ).sort((a, b) => b - a);
 
     popover.appendChild(buildFilterSection("상태", STATUS_OPTIONS, state.filterStatuses, onChipChange));
+    if (ratings.length) {
+      popover.appendChild(
+        buildFilterSection(
+          "별점",
+          ratings.map((r) => [String(r), "★".repeat(r)] as [string, string]),
+          state.filterRatings,
+          onChipChange,
+        ),
+      );
+    }
     popover.appendChild(
       buildFilterSection(
         "저자",
@@ -697,6 +722,10 @@ function filtered(state: ControlsState, books: BookNote[]): BookNote[] {
       !b.frontmatter.tags.some((t) => state.filterTags.has(tagLeafOf(t)))
     ) {
       return false;
+    }
+    if (state.filterRatings.size > 0) {
+      const r = b.frontmatter.rating;
+      if (r === undefined || !state.filterRatings.has(String(r))) return false;
     }
     if (!q) return true;
     if (b.title.toLowerCase().includes(q)) return true;
