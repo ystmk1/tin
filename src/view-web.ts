@@ -168,13 +168,29 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
     head.innerHTML = "";
     const meta = getMetadata(b.filePath);
 
-    if (meta?.coverUrl) {
-      const cover = document.createElement("img");
-      cover.className = "dokki-panel-cover";
-      cover.alt = `${meta.title} 표지`;
-      cover.loading = "lazy";
-      cover.src = meta.coverUrl;
-      cover.addEventListener("error", () => cover.remove());
+    if (meta) {
+      // Cover (or letter placeholder) is the trigger for the actions popup —
+      // 다시 검색 / 지우기 live one depth deeper now, not inline.
+      const cover = document.createElement("button");
+      cover.className = "dokki-panel-cover dokki-panel-cover-btn";
+      cover.title = "표지를 눌러 다시 검색 / 지우기";
+      cover.setAttribute("aria-label", "도서 정보 옵션 열기");
+      if (meta.coverUrl) {
+        const img = document.createElement("img");
+        img.alt = `${meta.title} 표지`;
+        img.loading = "lazy";
+        img.src = meta.coverUrl;
+        img.addEventListener("error", () => {
+          img.remove();
+          cover.classList.add("dokki-panel-cover-fallback");
+          cover.textContent = (b.title[0] ?? "?").toUpperCase();
+        });
+        cover.appendChild(img);
+      } else {
+        cover.classList.add("dokki-panel-cover-fallback");
+        cover.textContent = (b.title[0] ?? "?").toUpperCase();
+      }
+      cover.addEventListener("click", () => openCoverActions(b));
       head.appendChild(cover);
     }
 
@@ -200,22 +216,6 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
       if (meta.pubYear) subBits.push(meta.pubYear);
       sub.textContent = subBits.join(" · ");
       titleWrap.appendChild(sub);
-
-      const actions = document.createElement("div");
-      actions.className = "dokki-panel-libactions";
-      const change = document.createElement("button");
-      change.className = "dokki-libaction";
-      change.textContent = "다시 검색";
-      change.addEventListener("click", () => openSearch(b));
-      const remove = document.createElement("button");
-      remove.className = "dokki-libaction dokki-libaction-quiet";
-      remove.textContent = "지우기";
-      remove.addEventListener("click", () => {
-        clearMetadata(b.filePath);
-        renderHead(head, b);
-      });
-      actions.append(change, remove);
-      titleWrap.appendChild(actions);
     } else {
       // No library metadata selected — surface the user's own frontmatter
       // (author / publisher) in the same libinfo slot. Status is handled
@@ -238,6 +238,76 @@ export function mountWebView({ books, mount }: WebViewOptions): void {
     }
 
     head.appendChild(titleWrap);
+  }
+
+  function openCoverActions(b: BookNote) {
+    const meta = getMetadata(b.filePath);
+    if (!meta) return;
+
+    const overlay = document.createElement("div");
+    overlay.className = "dokki-search-overlay";
+    const dialog = document.createElement("div");
+    dialog.className = "dokki-cover-dialog";
+
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "dokki-panel-close";
+    closeBtn.textContent = "×";
+    closeBtn.addEventListener("click", () => overlay.remove());
+    dialog.appendChild(closeBtn);
+
+    if (meta.coverUrl) {
+      const big = document.createElement("img");
+      big.className = "dokki-cover-big";
+      big.alt = `${meta.title} 표지`;
+      big.src = meta.coverUrl;
+      big.addEventListener("error", () => big.remove());
+      dialog.appendChild(big);
+    }
+
+    const info = document.createElement("div");
+    info.className = "dokki-cover-info";
+    const t = document.createElement("div");
+    t.className = "dokki-cover-title";
+    t.textContent = meta.title || b.title;
+    info.appendChild(t);
+    const subBits: string[] = [];
+    if (meta.author) subBits.push(meta.author);
+    if (meta.publisher) subBits.push(meta.publisher);
+    if (meta.pubYear) subBits.push(meta.pubYear);
+    if (subBits.length) {
+      const s = document.createElement("div");
+      s.className = "dokki-cover-sub";
+      s.textContent = subBits.join(" · ");
+      info.appendChild(s);
+    }
+    dialog.appendChild(info);
+
+    const actions = document.createElement("div");
+    actions.className = "dokki-cover-actions";
+    const change = document.createElement("button");
+    change.className = "dokki-libaction";
+    change.textContent = "다시 검색";
+    change.addEventListener("click", () => {
+      overlay.remove();
+      openSearch(b);
+    });
+    const remove = document.createElement("button");
+    remove.className = "dokki-libaction dokki-libaction-quiet";
+    remove.textContent = "지우기";
+    remove.addEventListener("click", () => {
+      clearMetadata(b.filePath);
+      overlay.remove();
+      const headEl = panel.querySelector(".dokki-panel-head") as HTMLElement | null;
+      if (headEl) renderHead(headEl, b);
+    });
+    actions.append(change, remove);
+    dialog.appendChild(actions);
+
+    overlay.appendChild(dialog);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    document.body.appendChild(overlay);
   }
 
   function openSearch(b: BookNote) {

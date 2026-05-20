@@ -183,7 +183,10 @@ function finalizePage(page: number, lines: string[]): PageExcerpt {
   let m: RegExpExecArray | null;
   while ((m = re.exec(body)) !== null) {
     const t = m[1].trim();
-    if (t) bolds.push(t);
+    // Skip very short bolds (e.g. connector words like "그리고") — they're
+    // sometimes emphasized in the body but make poor random excerpts.
+    // The body's own **bold** highlight is unaffected (rendered separately).
+    if ([...t].length >= 5) bolds.push(t);
   }
   return { page, body, boldFragments: bolds };
 }
