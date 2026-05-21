@@ -673,12 +673,15 @@ export function mountWebView({
     wheel.className = "dokki-pageindex-wheel";
     const track = document.createElement("div");
     track.className = "dokki-pageindex-track";
-    const items = b.pages.map((p) => {
+    const items = b.pages.map((p, i) => {
       const it = document.createElement("button");
       it.type = "button";
       it.className = "dokki-pageindex-item";
       it.textContent = `p.${p.page}`;
-      it.addEventListener("click", () => scrollToPage(p.page));
+      it.addEventListener("click", () => {
+        scrollToPage(p.page); // jump the note to this page
+        setCurrent(i); // and spin the wheel to it
+      });
       track.appendChild(it);
       return it;
     });
@@ -728,9 +731,10 @@ export function mountWebView({
       });
     };
     panel.addEventListener("scroll", idxScrollHandler);
-    // Disable the spin animation for the initial placement, then enable it.
+    // Start with the first page centred (no spin), then enable the animation —
+    // a focus-scroll or the reader scrolling will spin it from there.
     track.style.transition = "none";
-    setCurrent(nearestPage());
+    setCurrent(0);
     requestAnimationFrame(() => (track.style.transition = ""));
   }
 
@@ -1489,7 +1493,9 @@ function renderRatingEl(rating: number): HTMLElement {
   return wrap;
 }
 
-const BOLD_HTML = /\*\*([^*\n]+?)\*\*/g;
+// Bold span: may run across lines and contain an inner single-* italic
+// (rendered as nested <strong><em>). Only `**` closes it.
+const BOLD_HTML = /\*\*((?:[^*]|\*(?!\*))+?)\*\*/g;
 // Italic: a single *…* span. Applied AFTER bold so the ** are already gone.
 const ITALIC_HTML = /\*([^*\n]+?)\*/g;
 // Subheadings (### Title) — used inside page bodies of short-story
@@ -1529,6 +1535,7 @@ function renderBodyHTML(
   );
   // 3+ newlines = intentional skip; a single blank line is a paragraph break.
   html = html.replace(/\n{3,}/g, '<span class="dokki-skip" aria-hidden="true"></span>');
-  html = html.replace(BOLD_HTML, "<strong>$1</strong>");
+  // Bold first (rendering any nested *italic* inside it), then standalone italics.
+  html = html.replace(BOLD_HTML, (_m, inner: string) => `<strong>${inner.replace(ITALIC_HTML, "<em>$1</em>")}</strong>`);
   return html.replace(ITALIC_HTML, "<em>$1</em>");
 }

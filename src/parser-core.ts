@@ -2,9 +2,10 @@ import { BookNote, BookFrontmatter, PageExcerpt, BoldFragment, ReadingStatus } f
 
 // Page marker: "##### 24" or "##### 24p" or "##### 24p." or "##### 24쪽" etc.
 const PAGE_HEADER = /^#####\s+(\d+)\s*(?:p\.?|쪽|page)?\s*$/i;
-// Bold span. `[^*]` (not `[^*\n]`) so a single **…** may wrap several lines.
-// Single `*…*` (italic) is intentionally NOT matched — italics aren't excerpts.
-const BOLD_PATTERN = /\*\*([^*]+?)\*\*/g;
+// Bold span. Content allows newlines (multi-line bold) and inner single `*`
+// (a nested *italic* inside the bold) — only a `**` ends it. Standalone
+// `*…*` italics are not matched on their own (italics aren't excerpts).
+const BOLD_PATTERN = /\*\*((?:[^*]|\*(?!\*))+?)\*\*/g;
 const STAR_TAG = /^[★☆✦✧⭐]+$/;
 
 export type YamlParser = (raw: string) => Record<string, unknown> | null | undefined;
@@ -179,8 +180,38 @@ function parseBody(body: string): ParsedBody {
 }
 
 function finalizePage(page: number, lines: string[]): PageExcerpt {
-  const body = trimBlankEdges(lines).join("\n");
+  const body = fixStrayBold(trimBlankEdges(lines).join("\n"));
   return { page, body, boldFragments: extractBolds(body) };
+}
+
+/**
+ * Repair a paragraph bolded on only ONE side by mistake — a single stray `**`
+ * at the very start or very end of a (often multi-line) paragraph. We add the
+ * missing marker so it becomes a normal **…** span, which then renders bold
+ * and counts as one excerpt. Newlines (incl. blank-line skips) are preserved
+ * exactly; the .md file on disk is never touched.
+ */
+function fixStrayBold(body: string): string {
+  const lines = body.split("\n");
+  let i = 0;
+  while (i < lines.length) {
+    if (lines[i].trim() === "") {
+      i++;
+      continue;
+    }
+    let j = i; // paragraph spans [i, j)
+    while (j < lines.length && lines[j].trim() !== "") j++;
+    const para = lines.slice(i, j);
+    const count = (para.join("\n").match(/\*\*/g) ?? []).length;
+    if (count === 1) {
+      const startsBold = /^\s*\*\*/.test(para[0]);
+      const endsBold = /\*\*\s*$/.test(para[para.length - 1]);
+      if (startsBold && !endsBold) lines[j - 1] = lines[j - 1].replace(/\s*$/, "") + "**";
+      else if (endsBold && !startsBold) lines[i] = lines[i].replace(/^(\s*)/, "$1**");
+    }
+    i = j;
+  }
+  return lines.join("\n");
 }
 
 // Whitespace with exactly one newline (= consecutive lines, no blank line).
@@ -212,11 +243,12 @@ function extractBolds(body: string): string[] {
   for (const m of body.matchAll(BOLD_PATTERN)) {
     const start = m.index ?? 0;
     const between = prevEnd >= 0 ? body.slice(prevEnd, start) : "";
+    const content = m[1].replace(/\*/g, ""); // drop inner *italic* markers
     if (parts.length && SINGLE_BREAK.test(between)) {
-      parts.push(m[1]); // adjacent bold line → keep in the same excerpt
+      parts.push(content); // adjacent bold line → keep in the same excerpt
     } else {
       flush();
-      parts.push(m[1]);
+      parts.push(content);
     }
     prevEnd = start + m[0].length;
   }
