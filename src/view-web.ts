@@ -190,7 +190,7 @@ export function mountWebView({
   panelBackdrop.addEventListener("click", () => closePanel());
   mount.appendChild(panelBackdrop);
 
-  function openNote(b: BookNote) {
+  function openNote(b: BookNote, focus?: { page: number; text: string }) {
     lastOpenedBook = b;
     const inner = panel.querySelector(".dokki-panel-inner") as HTMLElement;
     inner.innerHTML = "";
@@ -239,23 +239,58 @@ export function mountWebView({
       e.textContent = b.externalQuote;
       inner.appendChild(e);
     }
+    // Resolve an ![[Note]] embed to that note's text, when it's a loaded note.
+    const resolveEmbed = (name: string): string | null => {
+      const hit = books.find(
+        (x) => x.title === name || x.filePath === name || x.filePath === `${name}.md`,
+      );
+      if (!hit) return null;
+      const parts: string[] = [];
+      if (hit.externalQuote) parts.push(hit.externalQuote);
+      for (const pg of hit.pages) parts.push(pg.body);
+      const text = parts.join("\n\n").trim();
+      return text || null;
+    };
+
     const pagesEl = document.createElement("div");
     pagesEl.className = "dokki-panel-pages";
     for (const p of b.pages) {
       const block = document.createElement("section");
       block.className = "dokki-panel-page";
+      block.dataset.page = String(p.page);
       const num = document.createElement("h3");
       num.textContent = `p. ${p.page}`;
       block.appendChild(num);
       const body = document.createElement("pre");
       body.className = "dokki-panel-body";
-      body.innerHTML = renderBodyHTML(p.body);
+      body.innerHTML = renderBodyHTML(p.body, resolveEmbed);
       block.appendChild(body);
       pagesEl.appendChild(block);
     }
     inner.appendChild(pagesEl);
     panel.classList.add("is-open");
     panelBackdrop.classList.add("is-open");
+    if (focus) scrollToExcerpt(inner, focus);
+  }
+
+  // Open scrolled so the excerpted passage sits ~mid-screen. Finds the matching
+  // <strong> in the right page (else the page itself) and centres it.
+  function scrollToExcerpt(inner: HTMLElement, focus: { page: number; text: string }) {
+    const core = stripWrappingQuotes(focus.text.split("\n")[0]).trim().slice(0, 8);
+    setTimeout(() => {
+      const section = inner.querySelector(
+        `.dokki-panel-page[data-page="${focus.page}"]`,
+      ) as HTMLElement | null;
+      if (!section) return;
+      let target: HTMLElement = section;
+      if (core) {
+        const hit = Array.from(section.querySelectorAll("strong")).find((s) =>
+          (s.textContent ?? "").includes(core),
+        ) as HTMLElement | undefined;
+        if (hit) target = hit;
+      }
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 60);
   }
 
   function renderHead(head: HTMLElement, b: BookNote) {
@@ -827,7 +862,7 @@ export function mountWebView({
 
   function renderAll() {
     mount.classList.toggle("dokki-demo", isDemo);
-    renderExcerpt(excerptWrap, books, (b) => openNote(b));
+    renderExcerpt(excerptWrap, books, (b, focus) => openNote(b, focus));
     renderControlsBar();
     renderGraphSection();
     renderStack();
@@ -860,7 +895,7 @@ function hasActiveFilter(state: ControlsState): boolean {
 function renderExcerpt(
   wrap: HTMLElement,
   books: BookNote[],
-  onOpen: (b: BookNote) => void,
+  onOpen: (b: BookNote, focus?: { page: number; text: string }) => void,
 ): void {
   wrap.innerHTML = "";
   const bolds = books.flatMap((b) => b.allBolds);
@@ -877,14 +912,16 @@ function renderExcerpt(
     const b = books.find((x) => x.filePath === pick.filePath);
     const quote = document.createElement("blockquote");
     quote.className = "dokki-quote";
-    quote.textContent = stripWrappingQuotes(pick.text);
+    // Strip quotes per line so a merged multi-line dialogue reads as one quote
+    // (the outer “ ” come from CSS); line breaks are preserved.
+    quote.textContent = pick.text.split("\n").map(stripWrappingQuotes).join("\n");
     wrap.appendChild(quote);
     const meta = document.createElement("div");
     meta.className = "dokki-quote-meta";
     const title = document.createElement("span");
     title.className = "dokki-quote-title";
     title.textContent = pick.bookTitle;
-    title.addEventListener("click", () => b && onOpen(b));
+    title.addEventListener("click", () => b && onOpen(b, { page: pick.page, text: pick.text }));
     meta.appendChild(title);
     if (pick.author) {
       meta.append(sep(), spanOf(pick.author));
@@ -1315,22 +1352,38 @@ const BOLD_HTML = /\*\*([^*\n]+?)\*\*/g;
 // collections etc. ## and # don't appear in user notes; ##### is the
 // page marker, parsed away earlier. We only handle exactly ###.
 const SUBHEADING_HTML = /^###[ \t]+(.+?)[ \t]*$/gm;
-function renderBodyHTML(body: string): string {
-  const escaped = body
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  // ### Title → block subheading. Run before bold/skips so the captured
-  // group text can still contain **bold** that gets processed later.
-  const withHeadings = escaped.replace(
-    SUBHEADING_HTML,
-    '<span class="dokki-subheading">$1</span>',
+const EMBED = /!\[\[([^\]]+)\]\]/g; // ![[Note]] / ![[Note#sec|alias]] / ![[img.png]]
+const MD_IMAGE = /!\[([^\]]*)\]\(([^)\s]+)\)/g; // ![alt](url)
+const IMG_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
+
+/**
+ * Render a page body to HTML.
+ * - `![[Note]]` transclusions show like a `>` quote (the referenced note's
+ *   text pulled in when `resolveEmbed` finds it, else just the name).
+ * - `![alt](url)` images render in place.
+ * - `### Title` → subheading, `**bold**` → highlight, big gaps → skip.
+ */
+function renderBodyHTML(
+  body: string,
+  resolveEmbed?: (name: string) => string | null,
+  depth = 0,
+): string {
+  let html = body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // ### Title → block subheading (before bold so its text can hold **bold**).
+  html = html.replace(SUBHEADING_HTML, '<span class="dokki-subheading">$1</span>');
+  // ![[…]] embeds → quote-styled block (display:block span, valid inside <pre>).
+  html = html.replace(EMBED, (_m, inner: string) => {
+    const name = inner.split("|")[0].split("#")[0].trim();
+    if (IMG_EXT.test(name)) return `<span class="dokki-embed-missing">🖼 ${name}</span>`;
+    const resolved = depth < 1 && resolveEmbed ? resolveEmbed(name) : null;
+    const innerHtml = resolved != null ? renderBodyHTML(resolved, undefined, depth + 1) : name;
+    return `<span class="dokki-panel-external dokki-embed">${innerHtml}</span>`;
+  });
+  // ![alt](url) → image in place (only safe URL schemes).
+  html = html.replace(MD_IMAGE, (_m, alt: string, url: string) =>
+    /^(https?:|data:|\/)/i.test(url) ? `<img class="dokki-md-img" src="${url}" alt="${alt}">` : alt,
   );
-  // 3+ consecutive newlines (=2+ blank lines) represent an intentional skip
-  // (middle of page skipped, or stitched-together continuous pages). Render
-  // as a single normalized gap regardless of how many enters were typed.
-  // A single blank line (\n\n, =book paragraph break) is preserved as-is
-  // by the surrounding white-space: pre-wrap.
-  const withSkips = withHeadings.replace(/\n{3,}/g, '<span class="dokki-skip" aria-hidden="true"></span>');
-  return withSkips.replace(BOLD_HTML, "<strong>$1</strong>");
+  // 3+ newlines = intentional skip; a single blank line is a paragraph break.
+  html = html.replace(/\n{3,}/g, '<span class="dokki-skip" aria-hidden="true"></span>');
+  return html.replace(BOLD_HTML, "<strong>$1</strong>");
 }

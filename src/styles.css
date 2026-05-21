@@ -280,6 +280,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
   color: var(--text-normal);
   font-style: normal;
   letter-spacing: -0.025em;
+  white-space: pre-wrap; /* keep line breaks in merged multi-line excerpts */
 }
 .dokki-quote::before { content: "“"; opacity: 0.4; margin-right: 2px; }
 .dokki-quote::after  { content: "”"; opacity: 0.4; margin-left: 2px; }
@@ -888,6 +889,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
   font-size: 0.95rem;
   font-style: italic;
   line-height: 1.6;
+  white-space: pre-wrap; /* keep the line breaks typed in the frontmatter comment */
 }
 .dokki-panel-external {
   margin: 0 0 24px;
@@ -941,6 +943,26 @@ html.dokki-no-splash #dokki-splash { display: none; }
   line-height: 1.35;
 }
 .dokki-panel-body .dokki-subheading:first-child { margin-top: 0; }
+/* ![[Note]] transclusion shown like the external `>` quote. */
+.dokki-panel-body .dokki-embed {
+  display: block;
+  margin: 14px 0;
+  padding: 12px 16px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+.dokki-embed-missing { color: var(--text-faint); font-style: italic; }
+/* Inline markdown images, rendered in place. */
+.dokki-panel-body .dokki-md-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0;
+  border-radius: 4px;
+}
 
 .dokki-panel-backdrop {
   position: fixed;

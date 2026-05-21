@@ -2,7 +2,9 @@ import { BookNote, BookFrontmatter, PageExcerpt, BoldFragment, ReadingStatus } f
 
 // Page marker: "##### 24" or "##### 24p" or "##### 24p." or "##### 24쪽" etc.
 const PAGE_HEADER = /^#####\s+(\d+)\s*(?:p\.?|쪽|page)?\s*$/i;
-const BOLD_PATTERN = /\*\*([^*\n]+?)\*\*/g;
+// Bold span. `[^*]` (not `[^*\n]`) so a single **…** may wrap several lines.
+// Single `*…*` (italic) is intentionally NOT matched — italics aren't excerpts.
+const BOLD_PATTERN = /\*\*([^*]+?)\*\*/g;
 const STAR_TAG = /^[★☆✦✧⭐]+$/;
 
 export type YamlParser = (raw: string) => Record<string, unknown> | null | undefined;
@@ -178,17 +180,48 @@ function parseBody(body: string): ParsedBody {
 
 function finalizePage(page: number, lines: string[]): PageExcerpt {
   const body = trimBlankEdges(lines).join("\n");
-  const bolds: string[] = [];
-  const re = new RegExp(BOLD_PATTERN.source, "g");
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(body)) !== null) {
-    const t = m[1].trim();
-    // Skip very short bolds (e.g. connector words like "그리고") — they're
-    // sometimes emphasized in the body but make poor random excerpts.
-    // The body's own **bold** highlight is unaffected (rendered separately).
-    if ([...t].length >= 5) bolds.push(t);
+  return { page, body, boldFragments: extractBolds(body) };
+}
+
+// Whitespace with exactly one newline (= consecutive lines, no blank line).
+const SINGLE_BREAK = /^[^\S\n]*\n[^\S\n]*$/;
+
+/**
+ * Excerpt candidates from a page's **bold** text. Line breaks are preserved so
+ * multi-line passages read as one quote. Two shapes both merge into one:
+ *   - one **…** span wrapping several lines, and
+ *   - separate **…** lines stacked with NO blank line between them.
+ * A blank line (or any non-whitespace text) between spans starts a new excerpt.
+ * Short fragments (< 5 non-space chars) are skipped; italics aren't matched.
+ * The body's own bold highlighting is rendered separately and unaffected.
+ */
+function extractBolds(body: string): string[] {
+  const out: string[] = [];
+  let parts: string[] = [];
+  let prevEnd = -1;
+  const flush = () => {
+    if (parts.length) {
+      const merged = parts.join("\n").trim();
+      const chars = merged.replace(/\s/g, "").length;
+      const words = merged.split(/\s+/).filter(Boolean).length;
+      // Skip tiny emphases — need at least 6 chars and 2 words to be an excerpt.
+      if (chars >= 6 && words >= 2) out.push(merged);
+      parts = [];
+    }
+  };
+  for (const m of body.matchAll(BOLD_PATTERN)) {
+    const start = m.index ?? 0;
+    const between = prevEnd >= 0 ? body.slice(prevEnd, start) : "";
+    if (parts.length && SINGLE_BREAK.test(between)) {
+      parts.push(m[1]); // adjacent bold line → keep in the same excerpt
+    } else {
+      flush();
+      parts.push(m[1]);
+    }
+    prevEnd = start + m[0].length;
   }
-  return { page, body, boldFragments: bolds };
+  flush();
+  return out;
 }
 
 function trimBlankEdges(lines: string[]): string[] {

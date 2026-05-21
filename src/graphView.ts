@@ -129,8 +129,8 @@ export function renderGraph(
   }));
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const links = rawLinks
-    .map((l) => ({ s: byId.get(l.source as string), t: byId.get(l.target as string) }))
-    .filter((l): l is { s: StarNode; t: StarNode } => !!l.s && !!l.t);
+    .map((l) => ({ s: byId.get(l.source as string), t: byId.get(l.target as string), ref: l.basis === "ref" }))
+    .filter((l): l is { s: StarNode; t: StarNode; ref: boolean } => !!l.s && !!l.t);
 
   // --- layout -------------------------------------------------------------
   if (galaxy) {
@@ -167,6 +167,24 @@ export function renderGraph(
       const z = gaussian(ARM_Z_MEAN, ARM_Z_DIST) * inward;
       const y = gaussian(0, GALAXY_THICKNESS);
       n.pos.copy(spiral(x, y, z, (armFor(n.id) * 2 * Math.PI) / ARMS));
+    }
+    // Books that explicitly reference each other ([[…]]) are the strongest
+    // tie — pull those pairs tightly together so they read as a close knot,
+    // overriding the looser author/tag arm placement.
+    const refLinks = links.filter((l) => l.ref);
+    if (refLinks.length) {
+      const REF_REST = 16;
+      for (let it = 0; it < 60; it++) {
+        for (const { s: a, t } of refLinks) {
+          const dx = t.pos.x - a.pos.x;
+          const dy = t.pos.y - a.pos.y;
+          const dz = t.pos.z - a.pos.z;
+          const d = Math.hypot(dx, dy, dz) || 1e-3;
+          const f = ((d - REF_REST) / d) * 0.5;
+          a.pos.x += dx * f; a.pos.y += dy * f; a.pos.z += dz * f;
+          t.pos.x -= dx * f; t.pos.y -= dy * f; t.pos.z -= dz * f;
+        }
+      }
     }
     // Normalise so the whole disc fits a predictable radius.
     let maxR = 1;
@@ -414,13 +432,15 @@ export function renderGraph(
   // One gentle spring pass: each link tugs its endpoints toward REST length,
   // the pulled node stays pinned — so neighbours trail it elastically.
   function relax() {
-    for (const { s, t } of links) {
+    for (const { s, t, ref } of links) {
       const dx = t.pos.x - s.pos.x;
       const dy = t.pos.y - s.pos.y;
       const dz = t.pos.z - s.pos.z;
       const d = Math.hypot(dx, dy, dz);
       if (d < 1e-3) continue;
-      const f = ((d - REST) / d) * STIFF * 0.5;
+      // Referenced pairs hold a much tighter rest length than author/tag ones.
+      const rest = ref ? 24 : REST;
+      const f = ((d - rest) / d) * STIFF * 0.5;
       if (s !== dragNode) {
         s.pos.x += dx * f;
         s.pos.y += dy * f;
