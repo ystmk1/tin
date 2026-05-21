@@ -1,5 +1,15 @@
-import { Plugin, WorkspaceLeaf, PluginSettingTab, Setting, App } from "obsidian";
+import {
+  Plugin,
+  WorkspaceLeaf,
+  PluginSettingTab,
+  Setting,
+  App,
+  Modal,
+  Notice,
+  Editor,
+} from "obsidian";
 import { DokkiView, VIEW_TYPE_DOKKI } from "./view";
+import { findPageFixes, applyPageFixes, type PageFix } from "./format";
 
 interface DokkiSettings {
   notesFolder: string;
@@ -27,6 +37,22 @@ export default class DokkiPlugin extends Plugin {
       id: "dokki-reload",
       name: "DoKKi 노트 다시 읽기",
       callback: () => this.reloadAllViews(),
+    });
+    this.addCommand({
+      id: "dokki-fix-page-format",
+      name: "페이지 양식 정리 제안 (##### Np.)",
+      editorCallback: (editor: Editor) => {
+        const text = editor.getValue();
+        const fixes = findPageFixes(text);
+        if (!fixes.length) {
+          new Notice("정리할 페이지 양식이 없습니다.");
+          return;
+        }
+        new PageFixModal(this.app, fixes, () => {
+          editor.setValue(applyPageFixes(text));
+          new Notice(`페이지 마커 ${fixes.length}개를 정리했습니다.`);
+        }).open();
+      },
     });
 
     this.addSettingTab(new DokkiSettingTab(this.app, this));
@@ -76,6 +102,49 @@ function debounce(fn: () => void, ms: number): () => void {
     if (t) clearTimeout(t);
     t = setTimeout(fn, ms);
   };
+}
+
+// Preview the suggested page-marker fixes before applying them.
+class PageFixModal extends Modal {
+  constructor(
+    app: App,
+    private fixes: PageFix[],
+    private onApply: () => void,
+  ) {
+    super(app);
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h3", { text: `페이지 양식 정리 제안 (${this.fixes.length}곳)` });
+    contentEl.createEl("p", {
+      text: "아래 줄을 DoKKi 표준 형식 “##### Np.” 로 바꿉니다.",
+      cls: "dokki-fix-desc",
+    });
+
+    const list = contentEl.createDiv({ cls: "dokki-fix-list" });
+    for (const f of this.fixes) {
+      const row = list.createDiv({ cls: "dokki-fix-row" });
+      row.createSpan({ cls: "dokki-fix-ln", text: `${f.line + 1}` });
+      row.createSpan({ cls: "dokki-fix-from", text: f.from.trim() || "(빈 줄)" });
+      row.createSpan({ cls: "dokki-fix-arrow", text: "→" });
+      row.createSpan({ cls: "dokki-fix-to", text: f.to });
+    }
+
+    const buttons = contentEl.createDiv({ cls: "dokki-fix-buttons" });
+    const cancel = buttons.createEl("button", { text: "취소" });
+    cancel.addEventListener("click", () => this.close());
+    const apply = buttons.createEl("button", { text: "적용", cls: "mod-cta" });
+    apply.addEventListener("click", () => {
+      this.onApply();
+      this.close();
+    });
+  }
+
+  onClose() {
+    this.contentEl.empty();
+  }
 }
 
 class DokkiSettingTab extends PluginSettingTab {
