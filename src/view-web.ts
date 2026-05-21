@@ -156,6 +156,18 @@ export function mountWebView({
     window.addEventListener("pointerup", up);
   });
 
+  // Pressing anywhere else clears the selection — except on an already-selected
+  // spine (so you can right-click it) or inside the context menu.
+  document.addEventListener("pointerdown", (e) => {
+    if (!selectedPaths.size) return;
+    const t = e.target as HTMLElement;
+    if (t.closest(".dokki-ctx-menu")) return;
+    const spine = t.closest(".dokki-spine") as HTMLElement | null;
+    if (spine && spine.dataset.path && selectedPaths.has(spine.dataset.path)) return;
+    selectedPaths.clear();
+    applySelectionClasses();
+  });
+
   // GitHub link lives at the very bottom now (desktop only, via CSS) — you
   // scroll past the book stack to reach it.
   const footer = document.createElement("footer");
