@@ -603,13 +603,20 @@ html.dokki-no-splash #dokki-splash { display: none; }
   );
 }
 
-/* When a cover colour is known, the left status band takes that colour; the
-   reading status is then carried by luminance (alpha) + line style only:
-   완독 full · 중단 dimmed solid · 읽는 중 dimmed dashed. Placed after the
-   neutral status rules so it wins (equal specificity). */
-.dokki-spine-tinted[data-status="finished"] { --spine-color: rgba(var(--spine-tint), 0.95); }
-.dokki-spine-tinted[data-status="stopped"]  { --spine-color: rgba(var(--spine-tint), 0.5); }
-.dokki-spine-tinted[data-status="reading"]  { --spine-color: rgba(var(--spine-tint), 0.5); }
+/* When a cover colour is known, the left status band keeps the cover's HUE
+   and chroma but pins LIGHTNESS per status via OKLCH — so reading status is
+   always told apart by brightness, whether the cover is vivid or near-white
+   (a pale cover no longer collapses into the stopped grey). Reading also
+   stays dashed (inherited). Darkest = 완독, mid = 읽는 중, lightest = 중단. */
+.dokki-spine-tinted[data-status="finished"] {
+  --spine-color: oklch(from rgb(var(--spine-tint)) 0.45 c h);
+}
+.dokki-spine-tinted[data-status="reading"] {
+  --spine-color: oklch(from rgb(var(--spine-tint)) 0.62 c h);
+}
+.dokki-spine-tinted[data-status="stopped"] {
+  --spine-color: oklch(from rgb(var(--spine-tint)) 0.80 c h);
+}
 
 /* Desktop: title (left) · author/publisher (middle) · status+date (right).
    All tracks are fr-based so the author column stays put regardless of how

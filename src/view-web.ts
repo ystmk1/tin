@@ -869,6 +869,46 @@ function renderFilterButton(
     hooks.onSearchOrFilter();
   };
 
+  // Drag-to-move: grab the popover by its header. Position (relative to the
+  // filter root) persists across rebuilds and reopens.
+  let popPos: { left: number; top: number } | null = null;
+  const applyPopPos = () => {
+    if (!popPos) return;
+    popover.style.left = `${popPos.left}px`;
+    popover.style.top = `${popPos.top}px`;
+    popover.style.right = "auto";
+  };
+  const makeHeadDraggable = (head: HTMLElement) => {
+    head.style.cursor = "move";
+    head.addEventListener("pointerdown", (e) => {
+      if ((e.target as HTMLElement).closest(".dokki-filter-clear")) return;
+      e.preventDefault();
+      const startLeft = popover.offsetLeft;
+      const startTop = popover.offsetTop;
+      const sx = e.clientX;
+      const sy = e.clientY;
+      popover.style.left = `${startLeft}px`;
+      popover.style.top = `${startTop}px`;
+      popover.style.right = "auto";
+      head.setPointerCapture(e.pointerId);
+      const move = (ev: PointerEvent) => {
+        popPos = { left: startLeft + (ev.clientX - sx), top: startTop + (ev.clientY - sy) };
+        applyPopPos();
+      };
+      const up = (ev: PointerEvent) => {
+        try {
+          head.releasePointerCapture(ev.pointerId);
+        } catch {
+          /* already released */
+        }
+        head.removeEventListener("pointermove", move);
+        head.removeEventListener("pointerup", up);
+      };
+      head.addEventListener("pointermove", move);
+      head.addEventListener("pointerup", up);
+    });
+  };
+
   const buildPopover = () => {
     popover.innerHTML = "";
     const head = document.createElement("div");
@@ -891,6 +931,7 @@ function renderFilterButton(
     });
     head.appendChild(clear);
     popover.appendChild(head);
+    makeHeadDraggable(head);
 
     // Graph connection basis (single-select; a view preference, not a filter —
     // so it sits apart from the badge/초기화).
@@ -942,6 +983,7 @@ function renderFilterButton(
         onChipChange,
       ),
     );
+    applyPopPos(); // keep a dragged position across rebuilds
   };
 
   btn.addEventListener("click", (e) => {
