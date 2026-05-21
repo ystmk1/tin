@@ -880,6 +880,8 @@ function renderFilterButton(
   };
   const makeHeadDraggable = (head: HTMLElement) => {
     head.style.cursor = "move";
+    head.style.userSelect = "none";
+    head.style.touchAction = "none";
     head.addEventListener("pointerdown", (e) => {
       if ((e.target as HTMLElement).closest(".dokki-filter-clear")) return;
       e.preventDefault();
@@ -890,22 +892,18 @@ function renderFilterButton(
       popover.style.left = `${startLeft}px`;
       popover.style.top = `${startTop}px`;
       popover.style.right = "auto";
-      head.setPointerCapture(e.pointerId);
+      // Track on window so the drag keeps up even if the cursor outruns the
+      // small header.
       const move = (ev: PointerEvent) => {
         popPos = { left: startLeft + (ev.clientX - sx), top: startTop + (ev.clientY - sy) };
         applyPopPos();
       };
-      const up = (ev: PointerEvent) => {
-        try {
-          head.releasePointerCapture(ev.pointerId);
-        } catch {
-          /* already released */
-        }
-        head.removeEventListener("pointermove", move);
-        head.removeEventListener("pointerup", up);
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
       };
-      head.addEventListener("pointermove", move);
-      head.addEventListener("pointerup", up);
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
     });
   };
 
