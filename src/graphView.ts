@@ -19,7 +19,7 @@ export interface GraphHandle {
 const HEIGHT = 260;
 // Notes with no cover colour shine a pale starlight blue-white.
 const DEFAULT_STAR = new THREE.Color("#cfe0ff");
-const LINK_BASE = new THREE.Color("#6f86c9");
+const LINK_COLOR = new THREE.Color("#7e90c0"); // faint blue-grey threads
 
 const DIM_NODE = 0.12;
 const DIM_LINK = 0.1;
@@ -134,7 +134,8 @@ export function renderGraph(
   const field = new THREE.Group();
   scene.add(field);
 
-  // Links — additive line segments between connected stars (none when "off").
+  // Links — straight, hair-thin dashed lines, kept very faint so they barely
+  // register against the stars (the dots are far heavier than the threads).
   const linkGeo = new THREE.BufferGeometry();
   const lPos = new Float32Array(links.length * 6);
   const lCol = new Float32Array(links.length * 6);
@@ -142,17 +143,18 @@ export function renderGraph(
   linkGeo.setAttribute("color", new THREE.BufferAttribute(lCol, 3));
   const linkLines = new THREE.LineSegments(
     linkGeo,
-    new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+    new THREE.LineDashedMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.5,
+      dashSize: 2.2,
+      gapSize: 4.5,
+      depthWrite: false,
+    }),
   );
   field.add(linkLines);
 
-  // Endpoints are fixed, so write link positions once.
   const linkPos = linkGeo.getAttribute("position") as THREE.BufferAttribute;
-  links.forEach((l, i) => {
-    linkPos.setXYZ(i * 2, l.s.pos.x, l.s.pos.y, l.s.pos.z);
-    linkPos.setXYZ(i * 2 + 1, l.t.pos.x, l.t.pos.y, l.t.pos.z);
-  });
-  linkPos.needsUpdate = true;
 
   // Stars — one additive sprite each.
   const starTex = makeStarTexture();
@@ -202,10 +204,10 @@ export function renderGraph(
     const col = linkGeo.getAttribute("color") as THREE.BufferAttribute;
     for (let i = 0; i < links.length; i++) {
       const lit = isLit(links[i].s.id) && isLit(links[i].t.id);
-      const k = lit ? 0.55 : DIM_LINK;
-      const r = LINK_BASE.r * k;
-      const g = LINK_BASE.g * k;
-      const b = LINK_BASE.b * k;
+      const k = lit ? 1 : DIM_LINK;
+      const r = LINK_COLOR.r * k;
+      const g = LINK_COLOR.g * k;
+      const b = LINK_COLOR.b * k;
       col.setXYZ(i * 2, r, g, b);
       col.setXYZ(i * 2 + 1, r, g, b);
     }
@@ -347,15 +349,18 @@ export function renderGraph(
   cv.addEventListener("pointercancel", endPointer);
   cv.addEventListener("wheel", onWheel, { passive: false });
 
-  // Write current node positions into the sprites + link geometry.
+  // Write current node positions into the sprites + straight link segments;
+  // dashes need line distances recomputed whenever endpoints move.
   function syncField() {
     for (let i = 0; i < nodes.length; i++) sprites[i].position.copy(nodes[i].pos);
     for (let i = 0; i < links.length; i++) {
-      const { s, t } = links[i];
-      linkPos.setXYZ(i * 2, s.pos.x, s.pos.y, s.pos.z);
-      linkPos.setXYZ(i * 2 + 1, t.pos.x, t.pos.y, t.pos.z);
+      const a = links[i].s.pos;
+      const b = links[i].t.pos;
+      linkPos.setXYZ(i * 2, a.x, a.y, a.z);
+      linkPos.setXYZ(i * 2 + 1, b.x, b.y, b.z);
     }
     linkPos.needsUpdate = true;
+    if (links.length) linkLines.computeLineDistances();
   }
 
   // One gentle spring pass: each link tugs its endpoints toward REST length,
