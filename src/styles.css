@@ -533,6 +533,20 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 
 /* === BOOK STACK === */
+.dokki-stack-wrap { position: relative; user-select: none; }
+/* Drag-select marquee over the book stack. */
+.dokki-marquee {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  border: 1px solid var(--interactive-accent, #5b7cff);
+  background: rgba(91, 124, 255, 0.12);
+  border-radius: 2px;
+}
+.dokki-spine.is-selected {
+  background: rgba(91, 124, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(91, 124, 255, 0.5);
+}
 .dokki-stack {
   display: flex;
   flex-direction: column;

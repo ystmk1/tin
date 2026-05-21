@@ -31,6 +31,7 @@ async function bootstrap() {
     mount: app!,
     onUpload: handleUpload,
     onDelete: handleDelete,
+    onDeleteMany: handleDeleteMany,
     onEditTags: handleEditTags,
     isDemoPath,
   });
@@ -55,6 +56,11 @@ async function handleUpload(files: File[]) {
 
 async function handleDelete(filename: string) {
   await deleteNote(filename);
+  await refresh();
+}
+
+async function handleDeleteMany(filenames: string[]) {
+  for (const f of filenames) await deleteNote(f);
   await refresh();
 }
 

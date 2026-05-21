@@ -25,6 +25,7 @@ export function renderBookStack(
   for (const b of sorted) {
     const row = list.createDiv({ cls: "dokki-spine" });
     row.dataset.status = b.status;
+    row.dataset.path = b.filePath;
     const tint = opts?.tintFor?.(b.filePath);
     if (tint) {
       row.addClass("dokki-spine-tinted");

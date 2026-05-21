@@ -16,6 +16,8 @@ export interface WebViewOptions {
   onUpload: (files: File[]) => Promise<void>;
   /** Delete an uploaded note by filename (main re-loads afterwards). */
   onDelete: (filename: string) => Promise<void>;
+  /** Delete several uploaded notes at once (one re-load afterwards). */
+  onDeleteMany: (filenames: string[]) => Promise<void>;
   /** Save edited tags for an uploaded note (main rewrites + re-loads). */
   onEditTags: (filename: string, tags: string[]) => Promise<void>;
   /** True for demo/built-in notes (not deletable/editable). */
@@ -33,6 +35,7 @@ export function mountWebView({
   mount,
   onUpload,
   onDelete,
+  onDeleteMany,
   onEditTags,
   isDemoPath,
 }: WebViewOptions): WebViewHandle {
@@ -46,6 +49,15 @@ export function mountWebView({
   };
   let graph: GraphHandle | null = null;
   let lastOpenedBook: BookNote | null = null;
+  // Marquee multi-select over the book stack.
+  const selectedPaths = new Set<string>();
+  let suppressOpen = false; // a drag just happened — swallow the trailing click
+
+  function applySelectionClasses() {
+    stackWrap.querySelectorAll<HTMLElement>(".dokki-spine").forEach((row) => {
+      row.classList.toggle("is-selected", !!row.dataset.path && selectedPaths.has(row.dataset.path));
+    });
+  }
   let controlsEl: HTMLElement | null = null;
 
   mount.classList.add("dokki-root");
@@ -90,6 +102,59 @@ export function mountWebView({
   const stackWrap = document.createElement("div");
   stackWrap.className = "dokki-stack-wrap";
   mount.appendChild(stackWrap);
+
+  // Drag a marquee across the spines to select several at once (own notes
+  // only); right-clicking the selection then offers a bulk delete.
+  const marquee = document.createElement("div");
+  marquee.className = "dokki-marquee";
+  marquee.style.display = "none";
+  stackWrap.appendChild(marquee);
+
+  stackWrap.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || !isCloudEnabled || !getUser()) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const fromSpine = (e.target as HTMLElement).closest(".dokki-spine");
+    let moved = false;
+
+    const move = (ev: PointerEvent) => {
+      if (!moved && Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) < 6) return;
+      if (!moved) {
+        moved = true;
+        suppressOpen = true; // the trailing click shouldn't open a note
+        marquee.style.display = "block";
+      }
+      const minX = Math.min(startX, ev.clientX);
+      const maxX = Math.max(startX, ev.clientX);
+      const minY = Math.min(startY, ev.clientY);
+      const maxY = Math.max(startY, ev.clientY);
+      const wr = stackWrap.getBoundingClientRect();
+      marquee.style.left = `${minX - wr.left}px`;
+      marquee.style.top = `${minY - wr.top}px`;
+      marquee.style.width = `${maxX - minX}px`;
+      marquee.style.height = `${maxY - minY}px`;
+      selectedPaths.clear();
+      stackWrap.querySelectorAll<HTMLElement>(".dokki-spine").forEach((row) => {
+        const r = row.getBoundingClientRect();
+        const hit = r.left < maxX && r.right > minX && r.top < maxY && r.bottom > minY;
+        const path = row.dataset.path;
+        if (hit && path && !isDemoPath(path)) selectedPaths.add(path);
+      });
+      applySelectionClasses();
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      marquee.style.display = "none";
+      // A plain click on empty space clears the selection.
+      if (!moved && !fromSpine && selectedPaths.size) {
+        selectedPaths.clear();
+        applySelectionClasses();
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  });
 
   // GitHub link lives at the very bottom now (desktop only, via CSS) — you
   // scroll past the book stack to reach it.
@@ -506,17 +571,31 @@ export function mountWebView({
   }
 
   function renderStack() {
+    selectedPaths.clear();
     stackWrap.innerHTML = "";
+    stackWrap.appendChild(marquee);
     renderBookStack(
       stackWrap,
       filtered(state, books),
       (path) => {
+        if (suppressOpen) {
+          suppressOpen = false; // swallow the click that ended a marquee drag
+          return;
+        }
         const b = books.find((x) => x.filePath === path);
         if (b) openNote(b);
       },
       {
         tintFor: (path) => getMetadata(path)?.coverColor,
         onContextMenu: (path, x, y) => {
+          if (selectedPaths.size > 1 && selectedPaths.has(path)) {
+            openMultiDeleteMenu([...selectedPaths], x, y);
+            return;
+          }
+          if (selectedPaths.size) {
+            selectedPaths.clear();
+            applySelectionClasses();
+          }
           const b = books.find((x2) => x2.filePath === path);
           if (b) openSpineMenu(b, x, y);
         },
@@ -566,6 +645,41 @@ export function mountWebView({
     });
 
     menu.append(editBtn, delBtn);
+    document.body.appendChild(menu);
+
+    const close = (e: MouseEvent) => {
+      if (!menu.contains(e.target as Node)) {
+        menu.remove();
+        document.removeEventListener("mousedown", close);
+      }
+    };
+    setTimeout(() => document.addEventListener("mousedown", close), 0);
+  }
+
+  function openMultiDeleteMenu(paths: string[], x: number, y: number) {
+    const deletable = paths.filter((p) => !isDemoPath(p));
+    if (!isCloudEnabled || !getUser() || deletable.length === 0) return;
+
+    document.querySelector(".dokki-ctx-menu")?.remove();
+    const menu = document.createElement("div");
+    menu.className = "dokki-ctx-menu";
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "dokki-ctx-item dokki-ctx-danger";
+    delBtn.textContent = `삭제하기 (${deletable.length}개)`;
+    delBtn.addEventListener("click", async () => {
+      menu.remove();
+      if (!confirm(`선택한 ${deletable.length}개 노트를 삭제할까요? 되돌릴 수 없습니다.`)) return;
+      try {
+        await onDeleteMany(deletable);
+      } catch (e) {
+        alert(`삭제 실패: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    });
+
+    menu.append(delBtn);
     document.body.appendChild(menu);
 
     const close = (e: MouseEvent) => {
