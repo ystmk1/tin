@@ -197,6 +197,10 @@ export function renderGraph(
   const DIST_MAX = VIEW_R * 3;
   let dist = VIEW_R * 1.7; // backed out enough to see everything
   const forward = new THREE.Vector3();
+  // Pan offset (the world point the camera centres on); shift / middle-drag.
+  const pan = new THREE.Vector3();
+  const camRight = new THREE.Vector3();
+  const camUp = new THREE.Vector3();
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -267,6 +271,7 @@ export function renderGraph(
   const hitWorld = new THREE.Vector3();
 
   let dragging = false; // turning the view (empty-space drag)
+  let panningView = false; // shift / middle-button drag → pan the view
   let dragNode: StarNode | null = null; // pulling a star (Obsidian-style)
   let tapNode: StarNode | null = null;
   let settleUntil = 0; // keep the springs running briefly after release
@@ -301,14 +306,21 @@ export function renderGraph(
   }
 
   const onPointerDown = (e: PointerEvent) => {
+    if (e.button === 2) return; // leave right-click alone
     setPointer(e);
     downX = lastX = e.clientX;
     downY = lastY = e.clientY;
     moved = false;
-    const node = pickNode();
-    tapNode = node;
-    if (node) dragNode = node; // grab the star
-    else dragging = true; // empty space → turn the view
+    if (e.button === 1 || e.shiftKey) {
+      // Shift / middle-button → pan the whole view.
+      e.preventDefault();
+      panningView = true;
+    } else {
+      const node = pickNode();
+      tapNode = node;
+      if (node) dragNode = node; // grab the star
+      else dragging = true; // empty space → turn the view
+    }
     label.style.display = "none";
     renderer.domElement.setPointerCapture(e.pointerId);
   };
@@ -317,6 +329,17 @@ export function renderGraph(
     setPointer(e);
     if (Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY) > 4) moved = true;
 
+    if (panningView) {
+      // Slide the centre point along the camera's right/up axes.
+      const k = (2 * dist * Math.tan((camera.fov * Math.PI) / 360)) / HEIGHT;
+      camRight.set(1, 0, 0).applyEuler(camera.rotation);
+      camUp.set(0, 1, 0).applyEuler(camera.rotation);
+      pan.addScaledVector(camRight, -(e.clientX - lastX) * k);
+      pan.addScaledVector(camUp, (e.clientY - lastY) * k);
+      lastX = e.clientX;
+      lastY = e.clientY;
+      return;
+    }
     if (dragNode) {
       // Pull the star: project the cursor onto the plane through it, then
       // store the result in the field's local space (the field is rotating).
@@ -362,6 +385,7 @@ export function renderGraph(
     tapNode = null;
     dragNode = null;
     dragging = false;
+    panningView = false;
     try {
       renderer.domElement.releasePointerCapture(e.pointerId);
     } catch {
@@ -425,7 +449,8 @@ export function renderGraph(
     // the whole field — stays centred ahead, however far we back out.
     camera.rotation.set(pitch, yaw, 0);
     forward.set(0, 0, -1).applyEuler(camera.rotation);
-    camera.position.copy(forward).multiplyScalar(-dist);
+    // Centre on `pan`, sitting -dist behind it along the view axis.
+    camera.position.copy(pan).addScaledVector(forward, -dist);
     renderer.render(scene, camera);
   };
   tick();
