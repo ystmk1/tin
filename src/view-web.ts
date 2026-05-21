@@ -236,18 +236,6 @@ export function mountWebView({
       }
       inner.appendChild(tags);
     }
-    if (b.frontmatter.comment) {
-      const c = document.createElement("blockquote");
-      c.className = "dokki-panel-comment";
-      c.textContent = b.frontmatter.comment;
-      inner.appendChild(c);
-    }
-    if (b.externalQuote) {
-      const e = document.createElement("blockquote");
-      e.className = "dokki-panel-external";
-      e.textContent = b.externalQuote;
-      inner.appendChild(e);
-    }
     // Resolve an ![[Note]] embed to that note's text, when it's a loaded note.
     const resolveEmbed = (name: string): string | null => {
       const hit = books.find(
@@ -260,6 +248,21 @@ export function mountWebView({
       const text = parts.join("\n\n").trim();
       return text || null;
     };
+
+    if (b.frontmatter.comment) {
+      const c = document.createElement("blockquote");
+      c.className = "dokki-panel-comment";
+      c.textContent = b.frontmatter.comment;
+      inner.appendChild(c);
+    }
+    if (b.externalQuote) {
+      // The 서평/외부 인용 block can itself hold ![[embeds]] and **bold** — so
+      // render it the same way as page bodies (not plain text).
+      const e = document.createElement("blockquote");
+      e.className = "dokki-panel-external";
+      e.innerHTML = renderBodyHTML(b.externalQuote, resolveEmbed);
+      inner.appendChild(e);
+    }
 
     const pagesEl = document.createElement("div");
     pagesEl.className = "dokki-panel-pages";

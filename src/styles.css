@@ -944,7 +944,9 @@ html.dokki-no-splash #dokki-splash { display: none; }
   line-height: 1.35;
 }
 .dokki-panel-body .dokki-subheading:first-child { margin-top: 0; }
-.dokki-panel-body em { font-style: italic; }
+.dokki-panel-body em,
+.dokki-panel-external em { font-style: italic; }
+.dokki-panel-external strong { font-weight: 600; }
 
 /* === Page index — movable left popover, a "roulette" of pages === */
 .dokki-pageindex {
@@ -1026,7 +1028,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 .dokki-panel::-webkit-scrollbar-button { display: none; height: 0; }
 /* ![[Note]] transclusion shown like the external `>` quote. */
-.dokki-panel-body .dokki-embed {
+.dokki-embed {
   display: block;
   margin: 14px 0;
   padding: 12px 16px;
@@ -1038,7 +1040,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 .dokki-embed-missing { color: var(--text-faint); font-style: italic; }
 /* Inline markdown images, rendered in place. */
-.dokki-panel-body .dokki-md-img {
+.dokki-md-img {
   display: block;
   max-width: 100%;
   height: auto;
