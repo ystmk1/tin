@@ -75,17 +75,17 @@ export function mountWebView({
   const controlsHolder = document.createElement("div");
   mount.appendChild(controlsHolder);
 
-  // Graph section wraps the svg holder + the upload button overlay, so the
-  // button survives graph re-renders (which clear only the svg holder).
   const graphSection = document.createElement("div");
   graphSection.className = "dokki-graph-section";
   const graphWrap = document.createElement("div");
   graphWrap.className = "dokki-graph-wrap";
   graphSection.appendChild(graphWrap);
+  mount.appendChild(graphSection);
+
+  // Upload button lives in the controls bar (right of the filter); it's a
+  // persistent element moved into each freshly-built bar.
   const uploadSlot = document.createElement("div");
   uploadSlot.className = "dokki-upload-slot";
-  graphSection.appendChild(uploadSlot);
-  mount.appendChild(graphSection);
 
   const stackWrap = document.createElement("div");
   stackWrap.className = "dokki-stack-wrap";
@@ -587,6 +587,7 @@ export function mountWebView({
         renderGraphSection();
       },
     });
+    next.appendChild(uploadSlot); // upload button to the right of the filter
     if (controlsEl) controlsEl.replaceWith(next);
     else controlsHolder.appendChild(next);
     controlsEl = next;
@@ -638,9 +639,15 @@ export function mountWebView({
     uploadSlot.innerHTML = "";
     // Uploads need an account. Only show when signed in.
     if (!isCloudEnabled || !getUser()) return;
+    // Same pill as the filter button, with a leading "+" icon.
     const btn = document.createElement("button");
-    btn.className = "dokki-auth-btn";
-    btn.textContent = "노트 올리기";
+    btn.className = "dokki-filter-btn";
+    const icon = document.createElement("span");
+    icon.className = "dokki-filter-icon";
+    icon.textContent = "＋";
+    const lbl = document.createElement("span");
+    lbl.textContent = "노트 올리기";
+    btn.append(icon, lbl);
     const picker = document.createElement("input");
     picker.type = "file";
     picker.accept = ".md,text/markdown";

@@ -321,13 +321,14 @@ html.dokki-no-splash #dokki-splash { display: none; }
 /* === CONTROLS === */
 .dokki-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
   align-items: center;
   padding: 12px 0 24px;
   font-size: 0.85rem;
   font-family: var(--font-ui);
 }
+.dokki-search { grid-column: 1; } /* filter + upload follow in their own cells */
 .dokki-search {
   width: 100%;
   background: transparent;
@@ -525,16 +526,10 @@ html.dokki-no-splash #dokki-splash { display: none; }
   backdrop-filter: blur(2px);
 }
 
-/* Upload button floats over the graph box, bottom-right. */
+/* Upload button sits in the controls bar, right of the filter. */
 .dokki-upload-slot {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  z-index: 5;
-}
-.dokki-upload-slot .dokki-auth-btn {
-  background: var(--background-primary);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  display: inline-flex;
+  align-items: center;
 }
 
 /* === BOOK STACK === */

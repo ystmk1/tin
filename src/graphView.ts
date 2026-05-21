@@ -7,8 +7,8 @@ export interface GraphHandle {
   /** Tear down the WebGL scene. */
   cleanup: () => void;
   /**
-   * Dim every node not in `highlightIds`, plus any link touching a dimmed
-   * node. Pass `null` to clear (restore full brightness).
+   * Dim every note not in `highlightIds`. Pass `null` to clear (restore full
+   * brightness).
    */
   setHighlight: (highlightIds: Set<string> | null) => void;
   /** Re-read cover colours and repaint the stars (after a cover is linked). */
@@ -19,15 +19,23 @@ export interface GraphHandle {
 const HEIGHT = 260;
 // Notes with no cover colour shine a pale starlight blue-white.
 const DEFAULT_STAR = new THREE.Color("#cfe0ff");
-const LINK_COLOR = new THREE.Color("#7e90c0"); // faint blue-grey threads
-
 const DIM_NODE = 0.12;
-const DIM_LINK = 0.1;
 
-// Stars sit in a spherical shell around the camera, which rests at the centre
-// and looks outward — like lying back and looking up at the sky.
+// "off" basis → a loose spherical shell of stars; otherwise the notes are
+// arranged into a spiral galaxy whose shape reflects their relationships.
 const R_MIN = 130;
 const R_MAX = 340;
+
+// Galaxy shape (scaled to fit the view via normalisation afterwards).
+const GAL_R = 300;
+const ARMS = 2;
+const SPIRAL = 3.5;
+const ARM_X_MEAN = 130;
+const ARM_X_DIST = 240;
+const ARM_Z_MEAN = 80;
+const ARM_Z_DIST = 90;
+const GALAXY_THICKNESS = 24;
+const GALAXY_TILT = -1.15; // radians — lay the disc back so we see it at an angle
 
 /** Crisp star sprite: solid bright core with a tight, faint halo. */
 function makeStarTexture(): THREE.Texture {
@@ -61,12 +69,31 @@ function coverStarColor(filePath: string): THREE.Color | null {
   return c;
 }
 
+/** Normal-distributed sample (Box–Muller). */
+function gaussian(mean: number, std: number): number {
+  let u = 0;
+  let v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return mean + std * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+/** Wind a point into a logarithmic spiral arm (galaxy plane = x/z). */
+function spiral(x: number, y: number, z: number, offset: number): THREE.Vector3 {
+  const r = Math.sqrt(x * x + z * z);
+  let theta = offset;
+  theta += x > 0 ? Math.atan(z / x) : Math.atan(z / x) + Math.PI;
+  theta += (r / ARM_X_DIST) * SPIRAL;
+  return new THREE.Vector3(r * Math.cos(theta), y, r * Math.sin(theta));
+}
+
 interface StarNode {
   id: string;
   title: string;
   degree: number;
   filePath: string;
-  pos: THREE.Vector3; // fixed position in the field's local space
+  rating: number; // 0 (none/1★ look) … 5
+  pos: THREE.Vector3; // position in the field's local space
 }
 
 export function renderGraph(
@@ -76,40 +103,89 @@ export function renderGraph(
   basis: GraphBasis = "both",
 ): GraphHandle {
   const { nodes: rawNodes, links: rawLinks } = buildGraph(books, basis);
+  const galaxy = basis !== "off";
 
   let width = container.clientWidth || 800;
   container.style.height = `${HEIGHT}px`;
   container.style.position = "relative";
 
+  const ratingOf = new Map(books.map((b) => [b.filePath, b.frontmatter.rating ?? 0]));
   const maxDeg = Math.max(1, ...rawNodes.map((n) => n.degree));
   const heat = (deg: number) => Math.sqrt(deg / maxDeg); // 0..1, connectivity
-  // Connectivity barely nudges size and brightness.
-  const starSize = (deg: number) => 8 + 4 * heat(deg);
-  const baseOpacity = (deg: number) => 0.82 + 0.18 * heat(deg);
-  const starColorFor = (filePath: string, deg: number) =>
-    (coverStarColor(filePath) ?? DEFAULT_STAR.clone()).multiplyScalar(0.88 + 0.12 * heat(deg));
+  // Brightness follows the rating like a stellar magnitude: 5★ = brightest,
+  // 1★ (and unrated) ≈ the old baseline. Size lifts a touch alongside it.
+  const ratingNorm = (r: number) => (r > 0 ? Math.min(1, (r - 1) / 4) : 0);
+  const starSize = (r: number) => 7 + 2.6 * ratingNorm(r);
+  const baseOpacity = (r: number) => 0.8 + 0.2 * ratingNorm(r);
+  const starColorFor = (filePath: string) => coverStarColor(filePath) ?? DEFAULT_STAR.clone();
 
-  // Scatter each star once through the spherical shell.
-  const nodes: StarNode[] = rawNodes.map((n) => {
-    const r = R_MIN + (R_MAX - R_MIN) * Math.cbrt(Math.random());
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2 * Math.random() - 1);
-    return {
-      id: n.id,
-      title: n.title,
-      degree: n.degree,
-      filePath: n.filePath,
-      pos: new THREE.Vector3(
-        r * Math.sin(phi) * Math.cos(theta),
-        r * Math.sin(phi) * Math.sin(theta),
-        r * Math.cos(phi),
-      ),
-    };
-  });
+  const nodes: StarNode[] = rawNodes.map((n) => ({
+    id: n.id,
+    title: n.title,
+    degree: n.degree,
+    filePath: n.filePath,
+    rating: ratingOf.get(n.filePath) ?? 0,
+    pos: new THREE.Vector3(),
+  }));
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const links = rawLinks
     .map((l) => ({ s: byId.get(l.source as string), t: byId.get(l.target as string) }))
     .filter((l): l is { s: StarNode; t: StarNode } => !!l.s && !!l.t);
+
+  // --- layout -------------------------------------------------------------
+  if (galaxy) {
+    // Group connected notes (union-find) so each cluster lands on one arm —
+    // the relationships shape the galaxy. Hubs (high degree) sink toward the
+    // bright central bulge; loosely-linked notes drift out along the arms.
+    const parent = new Map(nodes.map((n) => [n.id, n.id]));
+    const find = (x: string): string => {
+      let r = x;
+      while (parent.get(r) !== r) r = parent.get(r)!;
+      while (parent.get(x) !== r) {
+        const next = parent.get(x)!;
+        parent.set(x, r);
+        x = next;
+      }
+      return r;
+    };
+    for (const l of rawLinks) {
+      const ra = find(l.source as string);
+      const rb = find(l.target as string);
+      if (ra !== rb) parent.set(ra, rb);
+    }
+    const armOfRoot = new Map<string, number>();
+    let rootSeq = 0;
+    const armFor = (id: string) => {
+      const root = find(id);
+      if (!armOfRoot.has(root)) armOfRoot.set(root, rootSeq++ % ARMS);
+      return armOfRoot.get(root)!;
+    };
+
+    for (const n of nodes) {
+      const inward = 1 - 0.45 * heat(n.degree);
+      const x = gaussian(ARM_X_MEAN, ARM_X_DIST) * inward;
+      const z = gaussian(ARM_Z_MEAN, ARM_Z_DIST) * inward;
+      const y = gaussian(0, GALAXY_THICKNESS);
+      n.pos.copy(spiral(x, y, z, (armFor(n.id) * 2 * Math.PI) / ARMS));
+    }
+    // Normalise so the whole disc fits a predictable radius.
+    let maxR = 1;
+    for (const n of nodes) maxR = Math.max(maxR, n.pos.length());
+    const s = GAL_R / maxR;
+    for (const n of nodes) n.pos.multiplyScalar(s);
+  } else {
+    // Loose spherical shell.
+    for (const n of nodes) {
+      const r = R_MIN + (R_MAX - R_MIN) * Math.cbrt(Math.random());
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      n.pos.set(
+        r * Math.sin(phi) * Math.cos(theta),
+        r * Math.sin(phi) * Math.sin(theta),
+        r * Math.cos(phi),
+      );
+    }
+  }
 
   // --- three.js scene -----------------------------------------------------
   const scene = new THREE.Scene();
@@ -117,11 +193,9 @@ export function renderGraph(
   camera.rotation.order = "YXZ";
   let yaw = 0;
   let pitch = 0;
-  // Distance the camera sits *behind* the origin along its view axis. 0 = at
-  // the centre looking out (immersive sky); large = backed out beyond the
-  // shell, the whole field in front (overview). Wheel scrubs between them.
-  const DIST_MAX = R_MAX * 2.6;
-  let dist = R_MAX * 1.6; // start backed out enough to see everything
+  const VIEW_R = galaxy ? GAL_R : R_MAX;
+  const DIST_MAX = VIEW_R * 3;
+  let dist = VIEW_R * 1.7; // backed out enough to see everything
   const forward = new THREE.Vector3();
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -130,45 +204,26 @@ export function renderGraph(
   renderer.domElement.className = "dokki-graph-canvas";
   container.appendChild(renderer.domElement);
 
-  // The field holds stars + links and drifts slowly so the sky turns overhead.
+  // tilt holds the fixed disc tilt; field spins inside it (galaxy rotation).
+  const tilt = new THREE.Group();
+  tilt.rotation.x = galaxy ? GALAXY_TILT : 0;
+  scene.add(tilt);
   const field = new THREE.Group();
-  scene.add(field);
-
-  // Links — straight, hair-thin dashed lines, kept very faint so they barely
-  // register against the stars (the dots are far heavier than the threads).
-  const linkGeo = new THREE.BufferGeometry();
-  const lPos = new Float32Array(links.length * 6);
-  const lCol = new Float32Array(links.length * 6);
-  linkGeo.setAttribute("position", new THREE.BufferAttribute(lPos, 3));
-  linkGeo.setAttribute("color", new THREE.BufferAttribute(lCol, 3));
-  const linkLines = new THREE.LineSegments(
-    linkGeo,
-    new THREE.LineDashedMaterial({
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.5,
-      dashSize: 2.2,
-      gapSize: 4.5,
-      depthWrite: false,
-    }),
-  );
-  field.add(linkLines);
-
-  const linkPos = linkGeo.getAttribute("position") as THREE.BufferAttribute;
+  tilt.add(field);
 
   // Stars — one additive sprite each.
   const starTex = makeStarTexture();
   const sprites: THREE.Sprite[] = nodes.map((n) => {
     const mat = new THREE.SpriteMaterial({
       map: starTex,
-      color: starColorFor(n.filePath, n.degree),
+      color: starColorFor(n.filePath),
       transparent: true,
-      opacity: baseOpacity(n.degree),
+      opacity: baseOpacity(n.rating),
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
     const sp = new THREE.Sprite(mat);
-    const sz = starSize(n.degree);
+    const sz = starSize(n.rating);
     sp.scale.set(sz, sz, 1);
     sp.position.copy(n.pos);
     sp.userData.node = n;
@@ -195,32 +250,17 @@ export function renderGraph(
     const lit = isLit(n.id);
     const hovered = hoverId === n.id;
     const mat = sp.material as THREE.SpriteMaterial;
-    mat.opacity = lit ? Math.min(1, baseOpacity(n.degree) * (hovered ? 1.2 : 1)) : DIM_NODE;
-    const sz = starSize(n.degree) * (hovered && lit ? 1.35 : 1);
+    mat.opacity = lit ? Math.min(1, baseOpacity(n.rating) * (hovered ? 1.2 : 1)) : DIM_NODE;
+    const sz = starSize(n.rating) * (hovered && lit ? 1.35 : 1);
     sp.scale.set(sz, sz, 1);
-  }
-
-  function applyLinkColors() {
-    const col = linkGeo.getAttribute("color") as THREE.BufferAttribute;
-    for (let i = 0; i < links.length; i++) {
-      const lit = isLit(links[i].s.id) && isLit(links[i].t.id);
-      const k = lit ? 1 : DIM_LINK;
-      const r = LINK_COLOR.r * k;
-      const g = LINK_COLOR.g * k;
-      const b = LINK_COLOR.b * k;
-      col.setXYZ(i * 2, r, g, b);
-      col.setXYZ(i * 2 + 1, r, g, b);
-    }
-    col.needsUpdate = true;
   }
 
   const setHighlight = (ids: Set<string> | null): void => {
     highlight = ids;
     for (let i = 0; i < nodes.length; i++) applyNodeStyle(i);
-    applyLinkColors();
   };
 
-  // --- pointer interaction (raycast pick / look-around / zoom) ------------
+  // --- pointer interaction (raycast pick / pull / look-around / zoom) -----
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   const dragPlane = new THREE.Plane();
@@ -237,8 +277,8 @@ export function renderGraph(
   let moved = false;
 
   // Soft springs let neighbours trail a pulled note. They run only while a
-  // drag is active (plus a short settle), so the idle starfield stays put.
-  const REST = 130;
+  // drag is active (plus a short settle), so the idle layout stays put.
+  const REST = galaxy ? 90 : 130;
   const STIFF = 0.08;
 
   function setPointer(e: PointerEvent) {
@@ -267,11 +307,8 @@ export function renderGraph(
     moved = false;
     const node = pickNode();
     tapNode = node;
-    if (node) {
-      dragNode = node; // grab the star
-    } else {
-      dragging = true; // empty space → turn the view
-    }
+    if (node) dragNode = node; // grab the star
+    else dragging = true; // empty space → turn the view
     label.style.display = "none";
     renderer.domElement.setPointerCapture(e.pointerId);
   };
@@ -290,7 +327,6 @@ export function renderGraph(
       return;
     }
     if (dragging) {
-      // Drag turns the view — look around the sky.
       yaw -= (e.clientX - lastX) * 0.005;
       pitch = Math.max(-1.3, Math.min(1.3, pitch - (e.clientY - lastY) * 0.005));
       lastX = e.clientX;
@@ -321,9 +357,8 @@ export function renderGraph(
   };
 
   const endPointer = (e: PointerEvent) => {
-    // A tap (no real movement) on a star opens it.
     if (!moved && tapNode) onOpen(tapNode.filePath);
-    if (dragNode) settleUntil = performance.now() + 1100; // let neighbours settle
+    if (dragNode) settleUntil = performance.now() + 1100;
     tapNode = null;
     dragNode = null;
     dragging = false;
@@ -336,8 +371,6 @@ export function renderGraph(
 
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
-    // Scroll out → pull the camera back past the shell; scroll in → toward
-    // the centre for the immersive sky view.
     dist = Math.min(DIST_MAX, Math.max(0, dist + e.deltaY * 0.6));
   };
 
@@ -349,18 +382,9 @@ export function renderGraph(
   cv.addEventListener("pointercancel", endPointer);
   cv.addEventListener("wheel", onWheel, { passive: false });
 
-  // Write current node positions into the sprites + straight link segments;
-  // dashes need line distances recomputed whenever endpoints move.
-  function syncField() {
+  // --- per-frame ----------------------------------------------------------
+  function syncStars() {
     for (let i = 0; i < nodes.length; i++) sprites[i].position.copy(nodes[i].pos);
-    for (let i = 0; i < links.length; i++) {
-      const a = links[i].s.pos;
-      const b = links[i].t.pos;
-      linkPos.setXYZ(i * 2, a.x, a.y, a.z);
-      linkPos.setXYZ(i * 2 + 1, b.x, b.y, b.z);
-    }
-    linkPos.needsUpdate = true;
-    if (links.length) linkLines.computeLineDistances();
   }
 
   // One gentle spring pass: each link tugs its endpoints toward REST length,
@@ -373,37 +397,32 @@ export function renderGraph(
       const d = Math.hypot(dx, dy, dz);
       if (d < 1e-3) continue;
       const f = ((d - REST) / d) * STIFF * 0.5;
-      const mx = dx * f;
-      const my = dy * f;
-      const mz = dz * f;
       if (s !== dragNode) {
-        s.pos.x += mx;
-        s.pos.y += my;
-        s.pos.z += mz;
+        s.pos.x += dx * f;
+        s.pos.y += dy * f;
+        s.pos.z += dz * f;
       }
       if (t !== dragNode) {
-        t.pos.x -= mx;
-        t.pos.y -= my;
-        t.pos.z -= mz;
+        t.pos.x -= dx * f;
+        t.pos.y -= dy * f;
+        t.pos.z -= dz * f;
       }
     }
   }
 
-  // --- per-frame: drift the field, aim the camera, render ----------------
-  applyLinkColors();
   let raf = 0;
-  let last = performance.now();
+  let lastT = performance.now();
   const tick = () => {
     raf = requestAnimationFrame(tick);
     const now = performance.now();
-    const dt = Math.min(0.05, (now - last) / 1000);
-    last = now;
-    field.rotation.y += dt * 0.05;
-    field.rotation.x += dt * 0.012;
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+    field.rotation.y += dt * (galaxy ? 0.045 : 0.05);
+    if (!galaxy) field.rotation.x += dt * 0.012;
     if (dragNode || now < settleUntil) relax();
-    syncField();
+    syncStars();
     // Face direction D (yaw/pitch); sit at -D*dist so the origin — and thus
-    // the whole shell — stays centred ahead, however far we back out.
+    // the whole field — stays centred ahead, however far we back out.
     camera.rotation.set(pitch, yaw, 0);
     forward.set(0, 0, -1).applyEuler(camera.rotation);
     camera.position.copy(forward).multiplyScalar(-dist);
@@ -431,10 +450,6 @@ export function renderGraph(
       label.remove();
       sprites.forEach((s) => (s.material as THREE.SpriteMaterial).dispose());
       starTex.dispose();
-      linkGeo.dispose();
-      (linkLines.material as THREE.Material).dispose();
-      // dispose() alone leaks the GL context; force it so repeated reloads
-      // (login swaps the view several times) don't exhaust the browser limit.
       renderer.forceContextLoss();
       renderer.dispose();
       cv.remove();
@@ -442,7 +457,7 @@ export function renderGraph(
     setHighlight,
     recolor: () => {
       for (let i = 0; i < nodes.length; i++) {
-        (sprites[i].material as THREE.SpriteMaterial).color.copy(starColorFor(nodes[i].filePath, nodes[i].degree));
+        (sprites[i].material as THREE.SpriteMaterial).color.copy(starColorFor(nodes[i].filePath));
       }
     },
   };
