@@ -943,6 +943,67 @@ html.dokki-no-splash #dokki-splash { display: none; }
   line-height: 1.35;
 }
 .dokki-panel-body .dokki-subheading:first-child { margin-top: 0; }
+.dokki-panel-body em { font-style: italic; }
+
+/* === Page index (movable left popover) === */
+.dokki-pageindex {
+  position: fixed;
+  left: 28px;
+  top: 96px;
+  z-index: 21; /* above the panel (20) so it floats over the note */
+  width: 158px;
+  max-height: 76vh;
+  overflow-y: auto;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.16);
+  padding: 8px 8px 10px;
+  font-family: var(--font-ui);
+}
+.dokki-pageindex-head {
+  cursor: move;
+  user-select: none;
+  padding: 4px 8px 9px;
+  margin-bottom: 6px;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.dokki-pageindex-list { display: flex; flex-direction: column; gap: 1px; }
+.dokki-pageindex-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  letter-spacing: -0.01em;
+  transition: background 0.12s, color 0.12s;
+}
+.dokki-pageindex-item:hover { background: var(--background-secondary); color: var(--text-normal); }
+.dokki-pageindex-page {
+  padding: 7px 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+.dokki-pageindex-sub {
+  padding: 5px 10px 5px 22px;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 768px) { .dokki-pageindex { display: none !important; } }
 /* ![[Note]] transclusion shown like the external `>` quote. */
 .dokki-panel-body .dokki-embed {
   display: block;

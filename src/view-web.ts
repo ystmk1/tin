@@ -190,6 +190,14 @@ export function mountWebView({
   panelBackdrop.addEventListener("click", () => closePanel());
   mount.appendChild(panelBackdrop);
 
+  // Movable page-index popover (left side) — a table of contents for the open
+  // note. Drag it by the header; its position persists across notes.
+  const pageIndex = document.createElement("nav");
+  pageIndex.className = "dokki-pageindex";
+  pageIndex.style.display = "none";
+  mount.appendChild(pageIndex);
+  let idxPos: { left: number; top: number } | null = null;
+
   function openNote(b: BookNote, focus?: { page: number; text: string }) {
     lastOpenedBook = b;
     const inner = panel.querySelector(".dokki-panel-inner") as HTMLElement;
@@ -270,6 +278,7 @@ export function mountWebView({
     inner.appendChild(pagesEl);
     panel.classList.add("is-open");
     panelBackdrop.classList.add("is-open");
+    buildPageIndex(b);
     if (focus) scrollToExcerpt(inner, focus);
   }
 
@@ -590,6 +599,88 @@ export function mountWebView({
   function closePanel() {
     panel.classList.remove("is-open");
     panelBackdrop.classList.remove("is-open");
+    pageIndex.style.display = "none";
+  }
+
+  // --- page index (left popover) -----------------------------------------
+  const applyIdxPos = () => {
+    if (!idxPos) return;
+    pageIndex.style.left = `${idxPos.left}px`;
+    pageIndex.style.top = `${idxPos.top}px`;
+  };
+  const makeIndexDraggable = (head: HTMLElement) => {
+    head.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      const startLeft = pageIndex.offsetLeft;
+      const startTop = pageIndex.offsetTop;
+      const sx = e.clientX;
+      const sy = e.clientY;
+      const move = (ev: PointerEvent) => {
+        idxPos = { left: startLeft + (ev.clientX - sx), top: startTop + (ev.clientY - sy) };
+        applyIdxPos();
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    });
+  };
+
+  function scrollToPage(page: number, sub?: string) {
+    const inner = panel.querySelector(".dokki-panel-inner") as HTMLElement | null;
+    const section = inner?.querySelector(
+      `.dokki-panel-page[data-page="${page}"]`,
+    ) as HTMLElement | null;
+    if (!section) return;
+    let target: HTMLElement = section;
+    if (sub) {
+      const hit = Array.from(section.querySelectorAll<HTMLElement>(".dokki-subheading")).find(
+        (e) => (e.textContent ?? "").trim() === sub,
+      );
+      if (hit) target = hit;
+    }
+    target.scrollIntoView({ block: sub ? "center" : "start", behavior: "smooth" });
+  }
+
+  function buildPageIndex(b: BookNote) {
+    pageIndex.innerHTML = "";
+    if (!b.pages.length) {
+      pageIndex.style.display = "none";
+      return;
+    }
+    const head = document.createElement("div");
+    head.className = "dokki-pageindex-head";
+    head.textContent = "페이지";
+    pageIndex.appendChild(head);
+    makeIndexDraggable(head);
+
+    const list = document.createElement("div");
+    list.className = "dokki-pageindex-list";
+    const SUB = /^###[ \t]+(.+?)[ \t]*$/gm;
+    for (const p of b.pages) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "dokki-pageindex-item dokki-pageindex-page";
+      item.textContent = `p.${p.page}`;
+      item.addEventListener("click", () => scrollToPage(p.page));
+      list.appendChild(item);
+      SUB.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = SUB.exec(p.body)) !== null) {
+        const sub = m[1].trim();
+        const s = document.createElement("button");
+        s.type = "button";
+        s.className = "dokki-pageindex-item dokki-pageindex-sub";
+        s.textContent = sub;
+        s.addEventListener("click", () => scrollToPage(p.page, sub));
+        list.appendChild(s);
+      }
+    }
+    pageIndex.appendChild(list);
+    applyIdxPos();
+    pageIndex.style.display = "block";
   }
 
   function renderGraphSection() {
@@ -1348,6 +1439,8 @@ function renderRatingEl(rating: number): HTMLElement {
 }
 
 const BOLD_HTML = /\*\*([^*\n]+?)\*\*/g;
+// Italic: a single *…* span. Applied AFTER bold so the ** are already gone.
+const ITALIC_HTML = /\*([^*\n]+?)\*/g;
 // Subheadings (### Title) — used inside page bodies of short-story
 // collections etc. ## and # don't appear in user notes; ##### is the
 // page marker, parsed away earlier. We only handle exactly ###.
@@ -1385,5 +1478,6 @@ function renderBodyHTML(
   );
   // 3+ newlines = intentional skip; a single blank line is a paragraph break.
   html = html.replace(/\n{3,}/g, '<span class="dokki-skip" aria-hidden="true"></span>');
-  return html.replace(BOLD_HTML, "<strong>$1</strong>");
+  html = html.replace(BOLD_HTML, "<strong>$1</strong>");
+  return html.replace(ITALIC_HTML, "<em>$1</em>");
 }
