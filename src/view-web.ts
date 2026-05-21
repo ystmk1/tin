@@ -680,6 +680,10 @@ export function mountWebView({
       it.className = "dokki-pageindex-item";
       it.textContent = `p.${p.page}`;
       it.addEventListener("click", () => {
+        if (dragMoved) {
+          dragMoved = false; // this was a spin-drag, not a tap
+          return;
+        }
         scrollToPage(p.page); // jump the note to this page
         setCurrent(i); // and spin the wheel to it
       });
@@ -692,6 +696,8 @@ export function mountWebView({
     pageIndex.style.display = "block";
 
     let current = -1;
+    let dragMoved = false; // a wheel drag happened → swallow the trailing click
+    let wheelDragging = false; // pause scroll-sync while spinning the wheel
     const setCurrent = (idx: number) => {
       if (idx === current) return;
       current = idx;
@@ -725,13 +731,44 @@ export function mountWebView({
 
     let raf = 0;
     idxScrollHandler = () => {
-      if (raf) return;
+      if (wheelDragging || raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
         setCurrent(nearestPage());
       });
     };
     panel.addEventListener("scroll", idxScrollHandler);
+
+    // Drag vertically on the wheel to spin through pages (like a picker).
+    wheel.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      const startY = e.clientY;
+      const startIdx = current;
+      dragMoved = false;
+      wheelDragging = true;
+      wheel.setPointerCapture(e.pointerId);
+      const move = (ev: PointerEvent) => {
+        const dy = ev.clientY - startY;
+        if (Math.abs(dy) > 4) dragMoved = true;
+        const idx = Math.max(0, Math.min(items.length - 1, startIdx + Math.round(-dy / PI_ROW)));
+        if (idx !== current) {
+          setCurrent(idx);
+          scrollToPage(b.pages[idx].page);
+        }
+      };
+      const up = (ev: PointerEvent) => {
+        try {
+          wheel.releasePointerCapture(ev.pointerId);
+        } catch {
+          /* already released */
+        }
+        wheel.removeEventListener("pointermove", move);
+        wheel.removeEventListener("pointerup", up);
+        setTimeout(() => (wheelDragging = false), 60);
+      };
+      wheel.addEventListener("pointermove", move);
+      wheel.addEventListener("pointerup", up);
+    });
     // Start with the first page centred (no spin), then enable the animation —
     // a focus-scroll or the reader scrolling will spin it from there.
     track.style.transition = "none";

@@ -982,6 +982,8 @@ html.dokki-no-splash #dokki-splash { display: none; }
   height: 130px; /* 5 × 26px */
   overflow: hidden;
   position: relative;
+  cursor: grab;
+  touch-action: none;
   -webkit-mask-image: linear-gradient(transparent, #000 24%, #000 76%, transparent);
   mask-image: linear-gradient(transparent, #000 24%, #000 76%, transparent);
 }
