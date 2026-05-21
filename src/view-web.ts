@@ -197,6 +197,7 @@ export function mountWebView({
   pageIndex.style.display = "none";
   mount.appendChild(pageIndex);
   let idxPos: { left: number; top: number } | null = null;
+  let idxScrollHandler: (() => void) | null = null;
 
   function openNote(b: BookNote, focus?: { page: number; text: string }) {
     lastOpenedBook = b;
@@ -600,6 +601,10 @@ export function mountWebView({
     panel.classList.remove("is-open");
     panelBackdrop.classList.remove("is-open");
     pageIndex.style.display = "none";
+    if (idxScrollHandler) {
+      panel.removeEventListener("scroll", idxScrollHandler);
+      idxScrollHandler = null;
+    }
   }
 
   // --- page index (left popover) -----------------------------------------
@@ -644,7 +649,15 @@ export function mountWebView({
     target.scrollIntoView({ block: sub ? "center" : "start", behavior: "smooth" });
   }
 
+  // The index is a vertical "roulette": the page you're scrolled to sits in
+  // the centre, two smaller/fainter pages above and below, and the whole wheel
+  // spins as the reading position crosses page boundaries.
+  const PI_ROW = 30; // px per row (keep in sync with CSS)
   function buildPageIndex(b: BookNote) {
+    if (idxScrollHandler) {
+      panel.removeEventListener("scroll", idxScrollHandler);
+      idxScrollHandler = null;
+    }
     pageIndex.innerHTML = "";
     if (!b.pages.length) {
       pageIndex.style.display = "none";
@@ -652,35 +665,73 @@ export function mountWebView({
     }
     const head = document.createElement("div");
     head.className = "dokki-pageindex-head";
-    head.textContent = "페이지";
+    head.textContent = "목차";
     pageIndex.appendChild(head);
     makeIndexDraggable(head);
 
-    const list = document.createElement("div");
-    list.className = "dokki-pageindex-list";
-    const SUB = /^###[ \t]+(.+?)[ \t]*$/gm;
-    for (const p of b.pages) {
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = "dokki-pageindex-item dokki-pageindex-page";
-      item.textContent = `p.${p.page}`;
-      item.addEventListener("click", () => scrollToPage(p.page));
-      list.appendChild(item);
-      SUB.lastIndex = 0;
-      let m: RegExpExecArray | null;
-      while ((m = SUB.exec(p.body)) !== null) {
-        const sub = m[1].trim();
-        const s = document.createElement("button");
-        s.type = "button";
-        s.className = "dokki-pageindex-item dokki-pageindex-sub";
-        s.textContent = sub;
-        s.addEventListener("click", () => scrollToPage(p.page, sub));
-        list.appendChild(s);
-      }
-    }
-    pageIndex.appendChild(list);
+    const wheel = document.createElement("div");
+    wheel.className = "dokki-pageindex-wheel";
+    const track = document.createElement("div");
+    track.className = "dokki-pageindex-track";
+    const items = b.pages.map((p) => {
+      const it = document.createElement("button");
+      it.type = "button";
+      it.className = "dokki-pageindex-item";
+      it.textContent = `p.${p.page}`;
+      it.addEventListener("click", () => scrollToPage(p.page));
+      track.appendChild(it);
+      return it;
+    });
+    wheel.appendChild(track);
+    pageIndex.appendChild(wheel);
     applyIdxPos();
     pageIndex.style.display = "block";
+
+    let current = -1;
+    const setCurrent = (idx: number) => {
+      if (idx === current) return;
+      current = idx;
+      track.style.transform = `translateY(${(2 - idx) * PI_ROW}px)`;
+      items.forEach((el, i) => {
+        const d = Math.abs(i - idx);
+        el.style.opacity = d === 0 ? "1" : d === 1 ? "0.5" : d === 2 ? "0.28" : "0";
+        el.style.transform = `scale(${d === 0 ? 1 : d === 1 ? 0.88 : 0.74})`;
+        el.style.pointerEvents = d > 2 ? "none" : "auto";
+        el.classList.toggle("is-current", d === 0);
+      });
+    };
+
+    // Which page section is nearest the panel's vertical centre.
+    const nearestPage = (): number => {
+      const sections = panel.querySelectorAll<HTMLElement>(".dokki-panel-page");
+      const pr = panel.getBoundingClientRect();
+      const cy = pr.top + pr.height / 2;
+      let best = 0;
+      let bestDist = Infinity;
+      sections.forEach((sec, i) => {
+        const r = sec.getBoundingClientRect();
+        const dist = cy < r.top ? r.top - cy : cy > r.bottom ? cy - r.bottom : 0;
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = i;
+        }
+      });
+      return best;
+    };
+
+    let raf = 0;
+    idxScrollHandler = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        setCurrent(nearestPage());
+      });
+    };
+    panel.addEventListener("scroll", idxScrollHandler);
+    // Disable the spin animation for the initial placement, then enable it.
+    track.style.transition = "none";
+    setCurrent(nearestPage());
+    requestAnimationFrame(() => (track.style.transition = ""));
   }
 
   function renderGraphSection() {
