@@ -646,13 +646,14 @@ export function mountWebView({
       );
       if (hit) target = hit;
     }
-    target.scrollIntoView({ block: sub ? "center" : "start", behavior: "smooth" });
+    // Instant jump — a smooth scroll over a long distance felt laggy.
+    target.scrollIntoView({ block: sub ? "center" : "start" });
   }
 
   // The index is a vertical "roulette": the page you're scrolled to sits in
   // the centre, two smaller/fainter pages above and below, and the whole wheel
   // spins as the reading position crosses page boundaries.
-  const PI_ROW = 30; // px per row (keep in sync with CSS)
+  const PI_ROW = 26; // px per row (keep in sync with CSS)
   function buildPageIndex(b: BookNote) {
     if (idxScrollHandler) {
       panel.removeEventListener("scroll", idxScrollHandler);
@@ -663,9 +664,9 @@ export function mountWebView({
       pageIndex.style.display = "none";
       return;
     }
+    // Slim drag bar (no label) for moving the popover.
     const head = document.createElement("div");
     head.className = "dokki-pageindex-head";
-    head.textContent = "목차";
     pageIndex.appendChild(head);
     makeIndexDraggable(head);
 
@@ -697,8 +698,8 @@ export function mountWebView({
       track.style.transform = `translateY(${(2 - idx) * PI_ROW}px)`;
       items.forEach((el, i) => {
         const d = Math.abs(i - idx);
-        el.style.opacity = d === 0 ? "1" : d === 1 ? "0.5" : d === 2 ? "0.28" : "0";
-        el.style.transform = `scale(${d === 0 ? 1 : d === 1 ? 0.88 : 0.74})`;
+        el.style.opacity = d === 0 ? "1" : d === 1 ? "0.78" : d === 2 ? "0.5" : "0";
+        el.style.transform = `scale(${d === 0 ? 1 : d === 1 ? 0.9 : 0.8})`;
         el.style.pointerEvents = d > 2 ? "none" : "auto";
         el.classList.toggle("is-current", d === 0);
       });
