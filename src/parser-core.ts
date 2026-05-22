@@ -1,7 +1,9 @@
 import { BookNote, BookFrontmatter, PageExcerpt, BoldFragment, ReadingStatus } from "./types";
 
-// Page marker: "##### 24" or "##### 24p" or "##### 24p." or "##### 24쪽" etc.
-const PAGE_HEADER = /^#####\s+(\d+)\s*(?:p\.?|쪽|page)?\s*$/i;
+// Page marker: "##### 24" / "##### 24p" / "##### 24p." / "##### 24쪽" etc., and
+// also a numberless "##### -" / "##### -p." used for e-books with no real
+// pagination (arbitrary divisions) — those get auto-numbered in order.
+const PAGE_HEADER = /^#####\s+(\d+|-)\s*(?:p\.?|쪽|page)?\s*$/i;
 // Bold span. Content allows newlines (multi-line bold) and inner single `*`
 // (a nested *italic* inside the bold) — only a `**` ends it. Standalone
 // `*…*` italics are not matched on their own (italics aren't excerpts).
@@ -154,6 +156,10 @@ function parseBody(body: string): ParsedBody {
   const pages: PageExcerpt[] = [];
 
   let current: { page: number; buf: string[] } | null = null;
+  // Tracks the highest page number seen so a numberless "-" marker can be
+  // auto-numbered as the next one in sequence (works for all-dash e-books and
+  // for notes that mix real numbers with dashes).
+  let autoPage = 0;
   // Before the first page marker: first the leading `>` quote ("quote"), then
   // any other lines ("preamble"). After a marker we're in "pages".
   let phase: "quote" | "preamble" = "quote";
@@ -162,7 +168,14 @@ function parseBody(body: string): ParsedBody {
     const pm = line.match(PAGE_HEADER);
     if (pm) {
       if (current) pages.push(finalizePage(current.page, current.buf));
-      current = { page: parseInt(pm[1], 10), buf: [] };
+      let page: number;
+      if (pm[1] === "-") {
+        page = ++autoPage;
+      } else {
+        page = parseInt(pm[1], 10);
+        autoPage = Math.max(autoPage, page);
+      }
+      current = { page, buf: [] };
       continue;
     }
     if (current) {
