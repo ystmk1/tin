@@ -902,6 +902,7 @@ html.dokki-no-splash #dokki-splash { display: none; }
   white-space: pre-wrap;
   line-height: 1.6;
 }
+.dokki-panel-preamble { margin: 0 0 8px; }
 .dokki-panel-pages {
   margin-top: 72px;
   /* `--dokki-gap` controls both inter-page spacing AND the normalized

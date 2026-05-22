@@ -18,7 +18,7 @@ export function parseBookContent(
 ): BookNote {
   const { fm, body } = splitFrontmatter(rawContent, parseYaml);
   const frontmatter = normalizeFrontmatter(fm);
-  const { externalQuote, pages } = parseBody(body);
+  const { externalQuote, preamble, pages } = parseBody(body);
   const allBolds: BoldFragment[] = [];
   for (const p of pages) {
     for (const b of p.boldFragments) {
@@ -36,6 +36,7 @@ export function parseBookContent(
     title,
     frontmatter,
     externalQuote,
+    preamble,
     pages,
     allBolds,
     status: deriveStatus(frontmatter),
@@ -140,43 +141,52 @@ function deriveStatus(fm: BookFrontmatter): ReadingStatus {
 
 interface ParsedBody {
   externalQuote?: string;
+  /** Content after the 서평 quote but before the first page marker (a `###`
+   *  heading and/or a few body lines). Kept verbatim; not a page. */
+  preamble?: string;
   pages: PageExcerpt[];
 }
 
 function parseBody(body: string): ParsedBody {
   const lines = body.split(/\r?\n/);
   const externalQuoteLines: string[] = [];
+  const preambleLines: string[] = [];
   const pages: PageExcerpt[] = [];
 
   let current: { page: number; buf: string[] } | null = null;
-  let inExternalQuote = true;
+  // Before the first page marker: first the leading `>` quote ("quote"), then
+  // any other lines ("preamble"). After a marker we're in "pages".
+  let phase: "quote" | "preamble" = "quote";
 
   for (const line of lines) {
     const pm = line.match(PAGE_HEADER);
     if (pm) {
       if (current) pages.push(finalizePage(current.page, current.buf));
       current = { page: parseInt(pm[1], 10), buf: [] };
-      inExternalQuote = false;
       continue;
     }
     if (current) {
       current.buf.push(line);
-    } else if (inExternalQuote) {
+      continue;
+    }
+    if (phase === "quote") {
       if (/^\s*>/.test(line)) {
         externalQuoteLines.push(line.replace(/^\s*>\s?/, ""));
-      } else if (externalQuoteLines.length && line.trim() === "") {
-        externalQuoteLines.push("");
-      } else if (externalQuoteLines.length === 0 && line.trim() === "") {
-        // skip leading blanks
-      } else if (externalQuoteLines.length > 0) {
-        inExternalQuote = false;
+        continue;
       }
+      if (line.trim() === "") {
+        if (externalQuoteLines.length) externalQuoteLines.push(""); // trailing blank, trimmed later
+        continue; // a blank line doesn't end the quote phase
+      }
+      phase = "preamble"; // first non-blank, non-quote line → preamble begins
     }
+    preambleLines.push(line);
   }
   if (current) pages.push(finalizePage(current.page, current.buf));
 
   const externalQuote = trimBlankEdges(externalQuoteLines).join("\n") || undefined;
-  return { externalQuote, pages };
+  const preamble = fixStrayBold(trimBlankEdges(preambleLines).join("\n")) || undefined;
+  return { externalQuote, preamble, pages };
 }
 
 function finalizePage(page: number, lines: string[]): PageExcerpt {

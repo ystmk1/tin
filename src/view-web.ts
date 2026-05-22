@@ -269,6 +269,14 @@ export function mountWebView({
       e.innerHTML = renderBodyHTML(b.externalQuote, resolveEmbed);
       inner.appendChild(e);
     }
+    if (b.preamble) {
+      // Content before the first page marker (a ### heading and/or a few
+      // lines) — shown verbatim, but it's not a page so it stays out of the TOC.
+      const pre = document.createElement("pre");
+      pre.className = "dokki-panel-body dokki-panel-preamble";
+      pre.innerHTML = renderBodyHTML(b.preamble, resolveEmbed);
+      inner.appendChild(pre);
+    }
 
     const pagesEl = document.createElement("div");
     pagesEl.className = "dokki-panel-pages";

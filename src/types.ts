@@ -24,6 +24,8 @@ export interface BookNote {
   title: string;
   frontmatter: BookFrontmatter;
   externalQuote?: string;
+  /** Content between the 서평 quote and the first page marker (verbatim). */
+  preamble?: string;
   pages: PageExcerpt[];
   allBolds: BoldFragment[];
   status: ReadingStatus;
