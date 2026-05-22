@@ -913,7 +913,9 @@ html.dokki-no-splash #dokki-splash { display: none; }
 .dokki-panel-pages section:last-child { margin-bottom: 0; }
 .dokki-skip {
   display: block;
-  height: var(--dokki-gap);
+  /* Falls back when outside .dokki-panel-pages (e.g. the preamble), where
+     --dokki-gap isn't defined — otherwise the gap would collapse to 0. */
+  height: var(--dokki-gap, 40px);
 }
 .dokki-panel-pages h3 {
   margin: 0 0 6px;
@@ -1111,16 +1113,6 @@ html.dokki-no-splash #dokki-splash { display: none; }
   font-size: 0.92rem;
   line-height: 1.6;
 }
-.dokki-embed-missing { color: var(--text-faint); font-style: italic; }
-/* Inline markdown images, rendered in place. */
-.dokki-md-img {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  margin: 12px 0;
-  border-radius: 4px;
-}
-
 .dokki-panel-backdrop {
   position: fixed;
   inset: 0;

@@ -1735,7 +1735,7 @@ const IMG_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
  * Render a page body to HTML.
  * - `![[Note]]` transclusions show like a `>` quote (the referenced note's
  *   text pulled in when `resolveEmbed` finds it, else just the name).
- * - `![alt](url)` images render in place.
+ * - Images (`![alt](url)` and `![[img.png]]`) are stripped out — not shown.
  * - `### Title` → subheading, `**bold**` → highlight, big gaps → skip.
  */
 function renderBodyHTML(
@@ -1744,20 +1744,24 @@ function renderBodyHTML(
   depth = 0,
 ): string {
   let html = body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // A `### Title` carries its own vertical spacing, so blank lines hugging it
+  // would stack a gap on top of a gap (and turn into a stray skip). Cap the
+  // blank lines directly above/below a heading to one before anything else runs.
+  html = html
+    .replace(/\n{2,}(?=###[ \t])/g, "\n\n")
+    .replace(/(^|\n)(###[ \t][^\n]*)\n{2,}/g, "$1$2\n\n");
   // ### Title → block subheading (before bold so its text can hold **bold**).
   html = html.replace(SUBHEADING_HTML, '<span class="dokki-subheading">$1</span>');
   // ![[…]] embeds → quote-styled block (display:block span, valid inside <pre>).
   html = html.replace(EMBED, (_m, inner: string) => {
     const name = inner.split("|")[0].split("#")[0].trim();
-    if (IMG_EXT.test(name)) return `<span class="dokki-embed-missing">🖼 ${name}</span>`;
+    if (IMG_EXT.test(name)) return ""; // images are not shown
     const resolved = depth < 1 && resolveEmbed ? resolveEmbed(name) : null;
     const innerHtml = resolved != null ? renderBodyHTML(resolved, undefined, depth + 1) : name;
     return `<span class="dokki-panel-external dokki-embed">${innerHtml}</span>`;
   });
-  // ![alt](url) → image in place (only safe URL schemes).
-  html = html.replace(MD_IMAGE, (_m, alt: string, url: string) =>
-    /^(https?:|data:|\/)/i.test(url) ? `<img class="dokki-md-img" src="${url}" alt="${alt}">` : alt,
-  );
+  // ![alt](url) → images are not shown; strip them out entirely.
+  html = html.replace(MD_IMAGE, "");
   // 3+ newlines = intentional skip; a single blank line is a paragraph break.
   html = html.replace(/\n{3,}/g, '<span class="dokki-skip" aria-hidden="true"></span>');
   // Bold first (rendering any nested *italic* inside it), then standalone italics.
