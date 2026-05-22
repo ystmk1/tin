@@ -100,14 +100,13 @@ export function mountWebView({
   const uploadSlot = document.createElement("div");
   uploadSlot.className = "dokki-upload-slot";
 
-  // "읽고 싶은 도서" — left side list (desktop only, hidden on mobile/narrow).
-  const wishWrap = document.createElement("aside");
-  wishWrap.className = "dokki-wishlist";
-  mount.appendChild(wishWrap);
-
   const stackWrap = document.createElement("div");
   stackWrap.className = "dokki-stack-wrap";
   mount.appendChild(stackWrap);
+
+  // "읽고 싶은 도서" — sits below the book stack, above the GitHub footer.
+  const wishWrap = document.createElement("section");
+  wishWrap.className = "dokki-wishlist";
 
   // Drag a marquee across the spines to select several at once (own notes
   // only); right-clicking the selection then offers a bulk delete.
@@ -185,6 +184,7 @@ export function mountWebView({
   repoLink.rel = "noopener";
   repoLink.textContent = "GitHub →";
   footer.appendChild(repoLink);
+  mount.appendChild(wishWrap); // want-to-read list, just above the footer
   mount.appendChild(footer);
 
   const panel = document.createElement("aside");
@@ -1077,7 +1077,15 @@ export function mountWebView({
 
     const list = document.createElement("div");
     list.className = "dokki-wishlist-list";
-    const items = getWishlist();
+    // Once a note exists for a wished title, drop it from the list automatically.
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
+    const owned = new Set(books.map((b) => norm(b.title)));
+    let items = getWishlist();
+    const matched = items.filter((it) => owned.has(norm(it.title)));
+    if (matched.length) {
+      for (const m of matched) removeWishlist(m.id);
+      items = getWishlist();
+    }
     if (!items.length) {
       const empty = document.createElement("div");
       empty.className = "dokki-wishlist-empty";

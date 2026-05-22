@@ -949,35 +949,26 @@ html.dokki-no-splash #dokki-splash { display: none; }
 .dokki-panel-external em { font-style: italic; }
 .dokki-panel-external strong { font-weight: 600; }
 
-/* === 읽고 싶은 도서 — left side list (desktop only) === */
+/* === 읽고 싶은 도서 — list below the book stack, above the footer === */
 .dokki-wishlist {
-  position: fixed;
-  left: 20px;
-  top: 96px;
-  width: 184px;
-  max-height: calc(100vh - 140px);
-  overflow-y: auto;
-  z-index: 5;
+  margin: 44px 0 0;
   font-family: var(--font-ui);
-  scrollbar-width: thin;
-  scrollbar-color: var(--background-modifier-border) transparent;
 }
-.dokki-wishlist::-webkit-scrollbar { width: 6px; }
-.dokki-wishlist::-webkit-scrollbar-thumb { background: var(--background-modifier-border); border-radius: 3px; }
 /* Lower in the visual hierarchy than the main book stack: smaller, fainter. */
 .dokki-wishlist-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   font-size: 0.66rem;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   font-weight: 600;
   color: var(--text-faint);
   text-transform: uppercase;
   padding-bottom: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   border-bottom: 1px solid var(--background-modifier-border);
 }
+.dokki-wishlist-head > span { margin-right: auto; }
 .dokki-wishlist-add {
   background: transparent;
   border: 1px solid var(--background-modifier-border);
@@ -1027,8 +1018,8 @@ html.dokki-no-splash #dokki-splash { display: none; }
 .dokki-wish-row:hover .dokki-wish-del { opacity: 1; }
 .dokki-wish-del:hover { color: var(--text-normal); }
 .dokki-search-card.is-added { opacity: 0.5; }
-/* Only show the side list where there's room beside the centred content. */
-@media (max-width: 1180px) { .dokki-wishlist { display: none; } }
+/* Mobile shows just the excerpt + stack (like the other secondary sections). */
+@media (max-width: 768px) { .dokki-wishlist { display: none; } }
 
 /* === Page index — movable left popover, a "roulette" of pages === */
 .dokki-pageindex {
