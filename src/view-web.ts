@@ -199,6 +199,20 @@ export function mountWebView({
   panelBackdrop.addEventListener("click", () => closePanel());
   mount.appendChild(panelBackdrop);
 
+  // Clicking a [[Note]] wikilink in the body opens that note (if it's loaded).
+  const decodeEntities = (s: string) =>
+    s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+  panel.addEventListener("click", (e) => {
+    const a = (e.target as HTMLElement).closest(".dokki-wikilink") as HTMLElement | null;
+    if (!a) return;
+    e.preventDefault();
+    const name = decodeEntities((a.dataset.target ?? "").trim());
+    const hit = books.find(
+      (x) => x.title === name || x.filePath === name || x.filePath === `${name}.md`,
+    );
+    if (hit) openNote(hit);
+  });
+
   // Movable page-index popover (left side) — a table of contents for the open
   // note. Drag it by the header; its position persists across notes.
   const pageIndex = document.createElement("nav");
@@ -242,7 +256,7 @@ export function mountWebView({
       for (const t of noteTags) {
         const span = document.createElement("span");
         span.className = "dokki-tag";
-        span.textContent = t;
+        span.textContent = tagLabel(t);
         tags.appendChild(span);
       }
       inner.appendChild(tags);
@@ -301,6 +315,9 @@ export function mountWebView({
     inner.appendChild(pagesEl);
     panel.classList.add("is-open");
     panelBackdrop.classList.add("is-open");
+    // Lock the background so the wheel scrolls the note, not the main page
+    // behind it (and hide the main scrollbar).
+    document.documentElement.classList.add("dokki-scroll-lock");
     buildPageIndex(b);
     if (focus) scrollToExcerpt(inner, focus);
   }
@@ -622,6 +639,7 @@ export function mountWebView({
   function closePanel() {
     panel.classList.remove("is-open");
     panelBackdrop.classList.remove("is-open");
+    document.documentElement.classList.remove("dokki-scroll-lock");
     pageIndex.style.display = "none";
     if (idxScrollHandler) {
       panel.removeEventListener("scroll", idxScrollHandler);
@@ -1223,6 +1241,31 @@ export function mountWebView({
       for (const it of items) {
         const row = document.createElement("div");
         row.className = "dokki-wish-row";
+        row.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          document.querySelector(".dokki-ctx-menu")?.remove();
+          const menu = document.createElement("div");
+          menu.className = "dokki-ctx-menu";
+          menu.style.left = `${e.clientX}px`;
+          menu.style.top = `${e.clientY}px`;
+          const dB = document.createElement("button");
+          dB.className = "dokki-ctx-item dokki-ctx-danger";
+          dB.textContent = "삭제하기";
+          dB.addEventListener("click", () => {
+            menu.remove();
+            removeWishlist(it.id);
+            renderWishlist();
+          });
+          menu.appendChild(dB);
+          document.body.appendChild(menu);
+          const close = (ev: MouseEvent) => {
+            if (!menu.contains(ev.target as Node)) {
+              menu.remove();
+              document.removeEventListener("mousedown", close);
+            }
+          };
+          setTimeout(() => document.addEventListener("mousedown", close), 0);
+        });
         const t = document.createElement("div");
         t.className = "dokki-wish-title";
         t.textContent = it.title;
@@ -1604,9 +1647,26 @@ function renderFilterButton(
     );
 
     const authors = uniqueSorted(books.map((b) => b.frontmatter.author ?? "").filter(Boolean));
-    const tagLeaves = uniqueSorted(
-      books.flatMap((b) => effectiveTags(b).map((t) => tagLeafOf(t))),
-    );
+    // Tag filter chips ordered by hierarchy (broad → narrow, via the deepest
+    // full tag path each leaf appears in) instead of 가나다, with 전집 tags
+    // pushed to the very end. Matching still uses the leaf value.
+    const STAR = /^[★☆✦✧⭐]+$/;
+    const leafPath = new Map<string, string>();
+    for (const b of books) {
+      for (const t of effectiveTags(b)) {
+        if (STAR.test(t)) continue;
+        const leaf = tagLeafOf(t);
+        const prev = leafPath.get(leaf);
+        if (!prev || t.split("/").length > prev.split("/").length) leafPath.set(leaf, t);
+      }
+    }
+    const isJip = (leaf: string) => /전집/.test(leaf) || /전집/.test(leafPath.get(leaf) ?? "");
+    const tagLeaves = [...leafPath.keys()].sort((a, b) => {
+      const aj = isJip(a);
+      const bj = isJip(b);
+      if (aj !== bj) return aj ? 1 : -1; // 전집 last
+      return (leafPath.get(a) ?? a).localeCompare(leafPath.get(b) ?? b, "ko");
+    });
     // Distinct ratings present in the data, high → low, labeled as filled stars.
     const ratings = Array.from(
       new Set(
@@ -1638,7 +1698,7 @@ function renderFilterButton(
     popover.appendChild(
       buildFilterSection(
         "태그",
-        tagLeaves.map((t) => [t, t] as [string, string]),
+        tagLeaves.map((t) => [t, tagLabel(t)] as [string, string]),
         state.filterTags,
         onChipChange,
       ),
@@ -1854,6 +1914,12 @@ const ITALIC_HTML = /\*([^*\n]+?)\*/g;
 // Subheadings (### Title) — used inside page bodies of short-story
 // collections etc. ## and # don't appear in user notes; ##### is the
 // page marker, parsed away earlier. We only handle exactly ###.
+// Display label for a tag: underscores read as spaces (e.g. 민음사_세계문학전집
+// → "민음사 세계문학전집"). The underscore stays in the stored/matched value.
+function tagLabel(t: string): string {
+  return t.replace(/_/g, " ");
+}
+
 const SUBHEADING_HTML = /^###[ \t]+(.+?)[ \t]*$/gm;
 const EMBED = /!\[\[([^\]]+)\]\]/g; // ![[Note]] / ![[Note#sec|alias]] / ![[img.png]]
 const MD_IMAGE = /!\[([^\]]*)\]\(([^)\s]+)\)/g; // ![alt](url)
@@ -1904,6 +1970,16 @@ function renderBodyHTML(
     const resolved = depth < 1 && resolveEmbed ? resolveEmbed(name) : null;
     const innerHtml = resolved != null ? renderBodyHTML(resolved, undefined, depth + 1) : name;
     return `<span class="dokki-panel-external dokki-embed">${innerHtml}</span>`;
+  });
+  // [[Note]] / [[Note#sec|alias]] → a clickable link to that note (the [[ ]]
+  // markup is hidden). The panel resolves the target on click and opens it;
+  // links to notes not in the library simply do nothing. Runs after EMBED so
+  // the `![[…]]` form is already consumed and only plain wikilinks remain.
+  html = html.replace(/\[\[([^\][]+)\]\]/g, (_m, inner: string) => {
+    const target = inner.split("|")[0].split("#")[0].trim();
+    const alias = inner.includes("|") ? inner.slice(inner.indexOf("|") + 1).trim() : "";
+    const label = alias || target;
+    return `<a class="dokki-wikilink" data-target="${target.replace(/"/g, "&quot;")}">${label}</a>`;
   });
   // ![alt](url) → images are not shown; strip them out entirely.
   html = html.replace(MD_IMAGE, "");

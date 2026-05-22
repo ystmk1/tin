@@ -677,6 +677,9 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 
 /* === DETAIL PANEL === */
+/* While a note panel is open, lock the background so the wheel scrolls the
+   note (its own overflow) and the main page scrollbar is hidden. */
+.dokki-scroll-lock { overflow: hidden; }
 .dokki-panel {
   position: fixed;
   top: 0; right: 0;
@@ -893,8 +896,9 @@ html.dokki-no-splash #dokki-splash { display: none; }
   white-space: pre-wrap; /* keep the line breaks typed in the frontmatter comment */
 }
 .dokki-panel-external {
-  /* Wide gap (≈ 2–3 enters) between the top 서평 quote and the body below. */
-  margin: 0 0 60px;
+  /* Wide gap (≈ 2–3 enters) directly below the top 서평 quote box, before the
+     body line that follows. */
+  margin: 0 0 72px;
   padding: 14px 18px;
   background: var(--background-secondary);
   border-radius: 6px;
@@ -950,6 +954,13 @@ html.dokki-no-splash #dokki-splash { display: none; }
   line-height: 1.35;
 }
 .dokki-panel-body .dokki-subheading:first-child { margin-top: 0; }
+.dokki-wikilink {
+  color: var(--interactive-accent, #5b7cff);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  cursor: pointer;
+}
+.dokki-wikilink:hover { border-bottom-color: currentColor; }
 .dokki-panel-body em,
 .dokki-panel-external em { font-style: italic; }
 .dokki-panel-external strong { font-weight: 600; }
