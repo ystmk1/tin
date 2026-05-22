@@ -1298,6 +1298,77 @@ html.dokki-no-splash #dokki-splash { display: none; }
   flex-direction: column;
   gap: 4px;
 }
+/* === Tag editor (with autocomplete) === */
+.dokki-tagedit { gap: 0; }
+.dokki-tagedit-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 14px 20px 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+}
+.dokki-tagedit-input {
+  flex: 1;
+  min-width: 140px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  padding: 4px 2px;
+}
+.dokki-tagedit-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  border-radius: 99px;
+  padding: 3px 6px 3px 10px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.dokki-tagedit-chip button {
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0 2px;
+}
+.dokki-tagedit-chip button:hover { color: var(--text-normal); }
+.dokki-tagedit-sugg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 20px;
+  overflow-y: auto;
+  max-height: 220px;
+  align-content: flex-start;
+}
+.dokki-tagedit-sugg-item {
+  border: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 99px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.dokki-tagedit-sugg-item:hover {
+  color: var(--text-normal);
+  border-color: var(--text-normal);
+}
+.dokki-tagedit-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 20px 16px;
+}
 .dokki-search-card {
   display: flex;
   gap: 12px;

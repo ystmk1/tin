@@ -3,7 +3,7 @@ import { renderGraph, type GraphHandle } from "./graphView";
 import { renderBookStack } from "./bookStack";
 import { tagLeafOf } from "./parser-core";
 import { searchBooks, NlBookResult } from "./nl-api";
-import { getMetadata, setMetadata, clearMetadata, setCoverColor } from "./note-metadata";
+import { getMetadata, setMetadata, clearMetadata, setCoverColor, effectiveTags } from "./note-metadata";
 import { isCloudEnabled } from "./supabase";
 import { signInWith, signOut, userLabel, getUser } from "./auth";
 import { extractCoverColor } from "./cover-color";
@@ -117,6 +117,9 @@ export function mountWebView({
 
   stackWrap.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || !isCloudEnabled || !getUser()) return;
+    // Marquee drag-select is desktop-only — on mobile (touch / narrow layout)
+    // it fights with scrolling, so leave taps to open notes as usual.
+    if (e.pointerType === "touch" || window.matchMedia("(max-width: 768px)").matches) return;
     const startX = e.clientX;
     const startY = e.clientY;
     const fromSpine = (e.target as HTMLElement).closest(".dokki-spine");
@@ -223,7 +226,8 @@ export function mountWebView({
     renderHead(head, b);
 
     const status = statusChipText(b);
-    if (status || b.frontmatter.tags.length > 0) {
+    const noteTags = effectiveTags(b);
+    if (status || noteTags.length > 0) {
       const tags = document.createElement("div");
       tags.className = "dokki-panel-tags";
       if (status) {
@@ -232,11 +236,10 @@ export function mountWebView({
         chip.textContent = status;
         tags.appendChild(chip);
       }
-      // One chip per frontmatter tag (no "#"). A single tag may itself be a
-      // path like "문학/해외문학" (kept verbatim), but separate tags — a 사조/
-      // 장르 like 포스트모더니즘, a 전집 like 민음사_세계문학전집 — stay as their
-      // own chips rather than being glued onto the path.
-      for (const t of b.frontmatter.tags) {
+      // One chip per tag (no "#"). A single tag may itself be a path like
+      // "문학/해외문학" (kept verbatim); separate tags — a 사조/장르 like
+      // 포스트모더니즘, a 전집, or a KDC overlay tag — stay as their own chips.
+      for (const t of noteTags) {
         const span = document.createElement("span");
         span.className = "dokki-tag";
         span.textContent = t;
@@ -866,21 +869,9 @@ export function mountWebView({
     const editBtn = document.createElement("button");
     editBtn.className = "dokki-ctx-item";
     editBtn.textContent = "태그 수정하기";
-    editBtn.addEventListener("click", async () => {
+    editBtn.addEventListener("click", () => {
       menu.remove();
-      // Comma-separated so a path tag like "문학/해외문학" survives as one tag
-      // (the "/" is internal to a single tag, not a separator).
-      const current = b.frontmatter.tags.join(", ");
-      const input = window.prompt("태그 (쉼표로 구분 · 경로는 / 사용 예: 문학/해외문학)", current);
-      if (input === null) return;
-      const edited = input.split(",").map((s) => s.trim()).filter(Boolean);
-      const rating = b.frontmatter.rating;
-      const tags = [...(rating ? ["☆".repeat(rating)] : []), ...edited];
-      try {
-        await onEditTags(b.filePath, tags);
-      } catch (e) {
-        alert(`태그 수정 실패: ${e instanceof Error ? e.message : String(e)}`);
-      }
+      openTagEditor(b);
     });
 
     const delBtn = document.createElement("button");
@@ -906,6 +897,139 @@ export function mountWebView({
       }
     };
     setTimeout(() => document.addEventListener("mousedown", close), 0);
+  }
+
+  // Tag editor with autocomplete over the tags already used across your notes.
+  // Edits the note's own frontmatter tags only — KDC overlay tags aren't
+  // editable here (they're derived from the linked call number).
+  function openTagEditor(b: BookNote) {
+    const STAR = /^[★☆✦✧⭐]+$/;
+    const current = b.frontmatter.tags.filter((t) => !STAR.test(t));
+    const known = uniqueSorted(
+      books.flatMap((bk) => bk.frontmatter.tags).filter((t) => !STAR.test(t)),
+    );
+
+    const overlay = document.createElement("div");
+    overlay.className = "dokki-search-overlay";
+    const dialog = document.createElement("div");
+    dialog.className = "dokki-search-dialog dokki-tagedit";
+
+    const head = document.createElement("div");
+    head.className = "dokki-search-head";
+    const heading = document.createElement("h3");
+    heading.textContent = "태그 수정";
+    head.appendChild(heading);
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "dokki-panel-close";
+    closeBtn.textContent = "×";
+    closeBtn.addEventListener("click", () => overlay.remove());
+    head.appendChild(closeBtn);
+    dialog.appendChild(head);
+
+    // Field = current tags as removable chips + an inline text input.
+    const field = document.createElement("div");
+    field.className = "dokki-tagedit-field";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "dokki-tagedit-input";
+    input.placeholder = "태그 입력 후 Enter (경로는 / 예: 문학/해외문학)";
+    field.appendChild(input);
+    dialog.appendChild(field);
+
+    const sugg = document.createElement("div");
+    sugg.className = "dokki-tagedit-sugg";
+    dialog.appendChild(sugg);
+
+    const actions = document.createElement("div");
+    actions.className = "dokki-tagedit-actions";
+    const save = document.createElement("button");
+    save.className = "dokki-search-submit";
+    save.textContent = "저장";
+    actions.appendChild(save);
+    dialog.appendChild(actions);
+
+    const renderChips = () => {
+      field.querySelectorAll(".dokki-tagedit-chip").forEach((n) => n.remove());
+      current.forEach((t, i) => {
+        const chip = document.createElement("span");
+        chip.className = "dokki-tagedit-chip";
+        chip.textContent = t;
+        const x = document.createElement("button");
+        x.type = "button";
+        x.textContent = "×";
+        x.addEventListener("click", () => {
+          current.splice(i, 1);
+          renderChips();
+          renderSugg();
+          input.focus();
+        });
+        chip.appendChild(x);
+        field.insertBefore(chip, input);
+      });
+    };
+    const addTag = (raw: string) => {
+      const t = raw.trim();
+      if (!t || current.includes(t)) {
+        input.value = "";
+        renderSugg();
+        return;
+      }
+      current.push(t);
+      input.value = "";
+      renderChips();
+      renderSugg();
+    };
+    const renderSugg = () => {
+      const q = input.value.trim().toLowerCase();
+      const pool = known.filter((t) => !current.includes(t) && (!q || t.toLowerCase().includes(q)));
+      sugg.innerHTML = "";
+      for (const t of pool.slice(0, 24)) {
+        const s = document.createElement("button");
+        s.type = "button";
+        s.className = "dokki-tagedit-sugg-item";
+        s.textContent = t;
+        s.addEventListener("click", () => {
+          addTag(t);
+          input.focus();
+        });
+        sugg.appendChild(s);
+      }
+    };
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === ",") {
+        e.preventDefault();
+        addTag(input.value);
+      } else if (e.key === "Backspace" && input.value === "" && current.length) {
+        current.pop();
+        renderChips();
+        renderSugg();
+      }
+    });
+    input.addEventListener("input", () => renderSugg());
+
+    save.addEventListener("click", async () => {
+      if (input.value.trim()) addTag(input.value); // commit a half-typed tag
+      const rating = b.frontmatter.rating;
+      const tags = [...(rating ? ["☆".repeat(rating)] : []), ...current];
+      save.disabled = true;
+      try {
+        await onEditTags(b.filePath, tags);
+        overlay.remove();
+      } catch (e) {
+        save.disabled = false;
+        alert(`태그 수정 실패: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    });
+
+    overlay.appendChild(dialog);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    document.body.appendChild(overlay);
+    renderChips();
+    renderSugg();
+    setTimeout(() => input.focus(), 50);
   }
 
   function openMultiDeleteMenu(paths: string[], x: number, y: number) {
@@ -1481,7 +1605,7 @@ function renderFilterButton(
 
     const authors = uniqueSorted(books.map((b) => b.frontmatter.author ?? "").filter(Boolean));
     const tagLeaves = uniqueSorted(
-      books.flatMap((b) => b.frontmatter.tags.map((t) => tagLeafOf(t))),
+      books.flatMap((b) => effectiveTags(b).map((t) => tagLeafOf(t))),
     );
     // Distinct ratings present in the data, high → low, labeled as filled stars.
     const ratings = Array.from(
@@ -1612,7 +1736,7 @@ function filtered(state: ControlsState, books: BookNote[]): BookNote[] {
     if (state.filterAuthors.size > 0 && !state.filterAuthors.has(b.frontmatter.author ?? "")) return false;
     if (
       state.filterTags.size > 0 &&
-      !b.frontmatter.tags.some((t) => state.filterTags.has(tagLeafOf(t)))
+      !effectiveTags(b).some((t) => state.filterTags.has(tagLeafOf(t)))
     ) {
       return false;
     }
@@ -1623,7 +1747,7 @@ function filtered(state: ControlsState, books: BookNote[]): BookNote[] {
     if (!q) return true;
     if (b.title.toLowerCase().includes(q)) return true;
     if ((b.frontmatter.author ?? "").toLowerCase().includes(q)) return true;
-    if (b.frontmatter.tags.some((t) => t.toLowerCase().includes(q))) return true;
+    if (effectiveTags(b).some((t) => t.toLowerCase().includes(q))) return true;
     if ((b.frontmatter.comment ?? "").toLowerCase().includes(q)) return true;
     if (b.pages.some((p) => p.body.toLowerCase().includes(q))) return true;
     return false;

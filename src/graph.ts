@@ -1,5 +1,6 @@
 import { BookNote, GraphBasis, GraphLink, GraphNode } from "./types";
 import { tagLeafOf } from "./parser-core";
+import { effectiveTags } from "./note-metadata";
 
 // Build the relationship graph. Two books connect when they share an author
 // and/or a tag-leaf, depending on `basis`:
@@ -117,7 +118,7 @@ function keysFor(b: BookNote, basis: GraphBasis): string[] {
   if (basis !== "tag" && b.frontmatter.author) keys.push(`author:${b.frontmatter.author}`);
   if (basis !== "author") {
     const leaves = new Set<string>();
-    for (const t of b.frontmatter.tags) {
+    for (const t of effectiveTags(b)) {
       const leaf = tagLeafOf(t);
       if (GENERIC_TAGS.has(leaf)) continue; // skip over-broad tags
       leaves.add(leaf);
@@ -128,10 +129,11 @@ function keysFor(b: BookNote, basis: GraphBasis): string[] {
 }
 
 function pickLeafTag(b: BookNote): string | undefined {
-  if (!b.frontmatter.tags.length) return undefined;
-  let best = b.frontmatter.tags[0];
+  const tags = effectiveTags(b);
+  if (!tags.length) return undefined;
+  let best = tags[0];
   let bestDepth = best.split("/").length;
-  for (const t of b.frontmatter.tags) {
+  for (const t of tags) {
     const d = t.split("/").length;
     if (d > bestDepth) {
       best = t;

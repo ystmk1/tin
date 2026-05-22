@@ -11,6 +11,8 @@
 // device-local entries are migrated up to the cloud once.
 
 import { NlBookResult } from "./nl-api";
+import { BookNote } from "./types";
+import { kdcTagsFromCallNo } from "./kdc";
 import { supabase } from "./supabase";
 import { getUser } from "./auth";
 
@@ -25,6 +27,7 @@ export interface NoteMetadata {
   isbn?: string;
   coverUrl?: string;
   coverColor?: string; // "r,g,b" sampled from the cover, cached (computed once)
+  callNo?: string; // 청구기호; its leading KDC digits drive overlay tags
   detailLink?: string;
   source?: string;
   selectedAt: string; // ISO date
@@ -49,6 +52,7 @@ export function setMetadata(filePath: string, result: NlBookResult): NoteMetadat
     pubYear: result.pubYear,
     isbn: result.isbn,
     coverUrl: result.coverUrl,
+    callNo: result.callNo,
     detailLink: result.detailLink,
     source: result.source,
     selectedAt: new Date().toISOString(),
@@ -159,6 +163,7 @@ interface Row {
   isbn: string | null;
   cover_url: string | null;
   cover_color: string | null;
+  call_no: string | null;
   detail_link: string | null;
   source: string | null;
   updated_at?: string | null;
@@ -174,6 +179,7 @@ function rowToMeta(row: Row): NoteMetadata {
     isbn: row.isbn ?? undefined,
     coverUrl: row.cover_url ?? undefined,
     coverColor: row.cover_color ?? undefined,
+    callNo: row.call_no ?? undefined,
     detailLink: row.detail_link ?? undefined,
     source: row.source ?? undefined,
     selectedAt: row.updated_at ?? new Date().toISOString(),
@@ -190,9 +196,27 @@ function metaToRow(meta: NoteMetadata): Omit<Row, "note_path"> {
     isbn: meta.isbn ?? null,
     cover_url: meta.coverUrl ?? null,
     cover_color: meta.coverColor ?? null,
+    call_no: meta.callNo ?? null,
     detail_link: meta.detailLink ?? null,
     source: meta.source ?? null,
   };
+}
+
+// ---------- derived tags ----------
+
+/**
+ * A note's frontmatter tags plus the KDC tags derived from its linked call
+ * number (an overlay — never written to the .md). Used by both the tag display
+ * and the graph so connections reflect the classification too. Frontmatter
+ * tags come first; KDC tags are appended only when not already present.
+ */
+export function effectiveTags(b: BookNote): string[] {
+  const out = [...b.frontmatter.tags];
+  const callNo = cache[b.filePath]?.callNo;
+  for (const t of kdcTagsFromCallNo(callNo)) {
+    if (!out.includes(t)) out.push(t);
+  }
+  return out;
 }
 
 // ---------- localStorage backend ----------
