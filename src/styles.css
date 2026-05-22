@@ -1354,6 +1354,22 @@ html.dokki-no-splash #dokki-splash { display: none; }
   padding: 0 2px;
 }
 .dokki-tagedit-chip button:hover { color: var(--text-normal); }
+.dokki-tagedit-rec {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 20px 0;
+}
+.dokki-tagedit-rec-label {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  margin-right: 2px;
+}
+.dokki-tagedit-rec-item {
+  border-color: var(--interactive-accent, #5b7cff) !important;
+  color: var(--interactive-accent, #5b7cff) !important;
+}
 .dokki-tagedit-sugg {
   display: flex;
   flex-wrap: wrap;

@@ -4,6 +4,7 @@ import { renderBookStack } from "./bookStack";
 import { tagLeafOf } from "./parser-core";
 import { searchBooks, NlBookResult } from "./nl-api";
 import { getMetadata, setMetadata, clearMetadata, setCoverColor, effectiveTags } from "./note-metadata";
+import { kdcTagsFromCallNo } from "./kdc";
 import { isCloudEnabled } from "./supabase";
 import { signInWith, signOut, userLabel, getUser } from "./auth";
 import { extractCoverColor } from "./cover-color";
@@ -954,6 +955,14 @@ export function mountWebView({
     field.appendChild(input);
     dialog.appendChild(field);
 
+    // Recommended classification tags from the linked book's open-API record
+    // (its KDC call number). Seeded from stored metadata, then refreshed by an
+    // ISBN lookup so books linked before the call number was captured still get
+    // suggestions. Clicking one bakes it into the note's tags (and the .md).
+    const rec = document.createElement("div");
+    rec.className = "dokki-tagedit-rec";
+    dialog.appendChild(rec);
+
     const sugg = document.createElement("div");
     sugg.className = "dokki-tagedit-sugg";
     dialog.appendChild(sugg);
@@ -979,6 +988,7 @@ export function mountWebView({
           current.splice(i, 1);
           renderChips();
           renderSugg();
+          renderRec();
           input.focus();
         });
         chip.appendChild(x);
@@ -996,6 +1006,28 @@ export function mountWebView({
       input.value = "";
       renderChips();
       renderSugg();
+      renderRec();
+    };
+    let recTags: string[] = kdcTagsFromCallNo(getMetadata(b.filePath)?.callNo);
+    const renderRec = () => {
+      const pool = recTags.filter((t) => !current.includes(t));
+      rec.innerHTML = "";
+      if (!pool.length) return;
+      const lbl = document.createElement("span");
+      lbl.className = "dokki-tagedit-rec-label";
+      lbl.textContent = "추천 분류";
+      rec.appendChild(lbl);
+      for (const t of pool) {
+        const s = document.createElement("button");
+        s.type = "button";
+        s.className = "dokki-tagedit-sugg-item dokki-tagedit-rec-item";
+        s.textContent = tagLabel(t);
+        s.addEventListener("click", () => {
+          addTag(t);
+          input.focus();
+        });
+        rec.appendChild(s);
+      }
     };
     const renderSugg = () => {
       const q = input.value.trim().toLowerCase();
@@ -1022,6 +1054,7 @@ export function mountWebView({
         current.pop();
         renderChips();
         renderSugg();
+        renderRec();
       }
     });
     input.addEventListener("input", () => renderSugg());
@@ -1047,7 +1080,28 @@ export function mountWebView({
     document.body.appendChild(overlay);
     renderChips();
     renderSugg();
+    renderRec();
     setTimeout(() => input.focus(), 50);
+
+    // Refresh recommendations from a live ISBN lookup (covers books linked
+    // before the call number was stored, or matched without one).
+    const isbn = getMetadata(b.filePath)?.isbn?.replace(/[-\s]/g, "");
+    if (isbn) {
+      void searchBooks(isbn)
+        .then((resp) => {
+          const hit =
+            resp.results.find((r) => r.isbn?.replace(/[-\s]/g, "") === isbn) ?? resp.results[0];
+          let changed = false;
+          for (const t of kdcTagsFromCallNo(hit?.callNo)) {
+            if (!recTags.includes(t)) {
+              recTags.push(t);
+              changed = true;
+            }
+          }
+          if (changed) renderRec();
+        })
+        .catch(() => {});
+    }
   }
 
   function openMultiDeleteMenu(paths: string[], x: number, y: number) {
