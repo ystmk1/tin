@@ -232,12 +232,14 @@ export function mountWebView({
         chip.textContent = status;
         tags.appendChild(chip);
       }
-      // No "#"; hierarchical tags are shown gathered as a path,
-      // e.g. 문학 / 해외문학 / 프랑스문학 → "문학/해외문학/프랑스문학".
-      if (b.frontmatter.tags.length) {
+      // One chip per frontmatter tag (no "#"). A single tag may itself be a
+      // path like "문학/해외문학" (kept verbatim), but separate tags — a 사조/
+      // 장르 like 포스트모더니즘, a 전집 like 민음사_세계문학전집 — stay as their
+      // own chips rather than being glued onto the path.
+      for (const t of b.frontmatter.tags) {
         const span = document.createElement("span");
         span.className = "dokki-tag";
-        span.textContent = b.frontmatter.tags.join("/");
+        span.textContent = t;
         tags.appendChild(span);
       }
       inner.appendChild(tags);
@@ -866,10 +868,12 @@ export function mountWebView({
     editBtn.textContent = "태그 수정하기";
     editBtn.addEventListener("click", async () => {
       menu.remove();
-      const current = b.frontmatter.tags.join("/");
-      const input = window.prompt("태그 (/ 또는 , 로 구분)", current);
+      // Comma-separated so a path tag like "문학/해외문학" survives as one tag
+      // (the "/" is internal to a single tag, not a separator).
+      const current = b.frontmatter.tags.join(", ");
+      const input = window.prompt("태그 (쉼표로 구분 · 경로는 / 사용 예: 문학/해외문학)", current);
       if (input === null) return;
-      const edited = input.split(/[/,]/).map((s) => s.trim()).filter(Boolean);
+      const edited = input.split(",").map((s) => s.trim()).filter(Boolean);
       const rating = b.frontmatter.rating;
       const tags = [...(rating ? ["☆".repeat(rating)] : []), ...edited];
       try {
@@ -1744,14 +1748,31 @@ function renderBodyHTML(
   depth = 0,
 ): string {
   let html = body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  // A `### Title` carries its own vertical spacing, so blank lines hugging it
-  // would stack a gap on top of a gap (and turn into a stray skip). Cap the
-  // blank lines directly above/below a heading to one before anything else runs.
-  html = html
-    .replace(/\n{2,}(?=###[ \t])/g, "\n\n")
-    .replace(/(^|\n)(###[ \t][^\n]*)\n{2,}/g, "$1$2\n\n");
   // ### Title → block subheading (before bold so its text can hold **bold**).
   html = html.replace(SUBHEADING_HTML, '<span class="dokki-subheading">$1</span>');
+  // The gap around a heading is owned by its CSS margins (top = wider, bottom =
+  // tight), so strip the blank lines the user happened to type around it —
+  // otherwise typed blanks would stack on the margins inconsistently.
+  html = html
+    .replace(/(<span class="dokki-subheading">[^<]*<\/span>)\n+/g, "$1")
+    .replace(/\n+(<span class="dokki-subheading">)/g, "\n$1");
+  // `> quote` lines → a quote box. `>` was escaped to `&gt;` above. Consecutive
+  // `>` lines (incl. empty `>` lines used as line breaks) form one box; a line
+  // without `>` ends it, so blank-line-separated groups become separate boxes.
+  html = html.replace(/(?:^&gt;[^\n]*(?:\n|$))+/gm, (block: string) => {
+    const inner = block
+      .replace(/\n+$/, "")
+      .split("\n")
+      .map((l) => l.replace(/^&gt;[ \t]?/, ""))
+      .join("\n")
+      .replace(/^\n+|\n+$/g, ""); // trim blank edges inside the box
+    return `<span class="dokki-panel-external dokki-blockquote">${inner}</span>`;
+  });
+  // Box spacing is owned by .dokki-blockquote margins; drop the literal newlines
+  // hugging each box so adjacent boxes get a consistent gap, not typed blanks.
+  html = html
+    .replace(/(<span class="dokki-panel-external dokki-blockquote">[\s\S]*?<\/span>)\n+/g, "$1")
+    .replace(/\n+(<span class="dokki-panel-external dokki-blockquote">)/g, "$1");
   // ![[…]] embeds → quote-styled block (display:block span, valid inside <pre>).
   html = html.replace(EMBED, (_m, inner: string) => {
     const name = inner.split("|")[0].split("#")[0].trim();

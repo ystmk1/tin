@@ -943,7 +943,9 @@ html.dokki-no-splash #dokki-splash { display: none; }
   font-size: 1.12rem;
   letter-spacing: -0.015em;
   color: var(--text-normal);
-  margin: 18px 0 6px;
+  /* Above the heading reads like 2 enters (a blank line); below it like 1 enter
+     (a tight line break) — the gap is owned here, not by typed blank lines. */
+  margin: 1.9em 0 0.35em;
   line-height: 1.35;
 }
 .dokki-panel-body .dokki-subheading:first-child { margin-top: 0; }
@@ -1112,6 +1114,12 @@ html.dokki-no-splash #dokki-splash { display: none; }
   color: var(--text-muted);
   font-size: 0.92rem;
   line-height: 1.6;
+}
+/* `> quote` inside a page body — same look as the 서평 external quote. Several
+   blank-line-separated groups each become their own box, spaced by this margin. */
+.dokki-blockquote {
+  display: block;
+  margin: 14px 0;
 }
 .dokki-panel-backdrop {
   position: fixed;
