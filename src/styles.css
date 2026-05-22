@@ -893,7 +893,8 @@ html.dokki-no-splash #dokki-splash { display: none; }
   white-space: pre-wrap; /* keep the line breaks typed in the frontmatter comment */
 }
 .dokki-panel-external {
-  margin: 0 0 24px;
+  /* Wide gap (≈ 2–3 enters) between the top 서평 quote and the body below. */
+  margin: 0 0 60px;
   padding: 14px 18px;
   background: var(--background-secondary);
   border-radius: 6px;
@@ -943,9 +944,9 @@ html.dokki-no-splash #dokki-splash { display: none; }
   font-size: 1.12rem;
   letter-spacing: -0.015em;
   color: var(--text-normal);
-  /* Above the heading reads like 2 enters (a blank line); below it like 1 enter
-     (a tight line break) — the gap is owned here, not by typed blank lines. */
-  margin: 1.9em 0 0.35em;
+  /* Wide gap above the heading (doubled), tight below (≈ 1 enter) — the gap is
+     owned here, not by typed blank lines. */
+  margin: 3.8em 0 0.35em;
   line-height: 1.35;
 }
 .dokki-panel-body .dokki-subheading:first-child { margin-top: 0; }
