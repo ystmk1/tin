@@ -7,6 +7,7 @@ import { getMetadata, setMetadata, clearMetadata, setCoverColor } from "./note-m
 import { isCloudEnabled } from "./supabase";
 import { signInWith, signOut, userLabel, getUser } from "./auth";
 import { extractCoverColor } from "./cover-color";
+import { getWishlist, addWishlist, removeWishlist, type WishItem } from "./wishlist";
 
 export interface WebViewOptions {
   books: BookNote[];
@@ -98,6 +99,11 @@ export function mountWebView({
   // persistent element moved into each freshly-built bar.
   const uploadSlot = document.createElement("div");
   uploadSlot.className = "dokki-upload-slot";
+
+  // "읽고 싶은 도서" — left side list (desktop only, hidden on mobile/narrow).
+  const wishWrap = document.createElement("aside");
+  wishWrap.className = "dokki-wishlist";
+  mount.appendChild(wishWrap);
 
   const stackWrap = document.createElement("div");
   stackWrap.className = "dokki-stack-wrap";
@@ -1047,6 +1053,167 @@ export function mountWebView({
     if (files && files.length) void doUpload(Array.from(files));
   });
 
+  function renderWishlist() {
+    wishWrap.innerHTML = "";
+    const head = document.createElement("div");
+    head.className = "dokki-wishlist-head";
+    const title = document.createElement("span");
+    title.textContent = "읽고 싶은 도서";
+    const add = document.createElement("button");
+    add.className = "dokki-wishlist-add";
+    add.textContent = "+";
+    add.title = "도서 검색해서 추가";
+    add.addEventListener("click", () => openWishlistSearch());
+    head.append(title, add);
+    wishWrap.appendChild(head);
+
+    const list = document.createElement("div");
+    list.className = "dokki-wishlist-list";
+    const items = getWishlist();
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "dokki-wishlist-empty";
+      empty.textContent = "+ 로 검색해서 추가";
+      list.appendChild(empty);
+    } else {
+      for (const it of items) {
+        const row = document.createElement("div");
+        row.className = "dokki-wish-row";
+        const t = document.createElement("div");
+        t.className = "dokki-wish-title";
+        t.textContent = it.title;
+        row.appendChild(t);
+        if (it.author) {
+          const a = document.createElement("div");
+          a.className = "dokki-wish-author";
+          a.textContent = it.author;
+          row.appendChild(a);
+        }
+        const del = document.createElement("button");
+        del.className = "dokki-wish-del";
+        del.textContent = "×";
+        del.title = "삭제";
+        del.addEventListener("click", () => {
+          removeWishlist(it.id);
+          renderWishlist();
+        });
+        row.appendChild(del);
+        list.appendChild(row);
+      }
+    }
+    wishWrap.appendChild(list);
+  }
+
+  function openWishlistSearch() {
+    const overlay = document.createElement("div");
+    overlay.className = "dokki-search-overlay";
+    const dialog = document.createElement("div");
+    dialog.className = "dokki-search-dialog";
+
+    const head = document.createElement("div");
+    head.className = "dokki-search-head";
+    const heading = document.createElement("h3");
+    heading.textContent = "읽고 싶은 도서 검색";
+    head.appendChild(heading);
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "dokki-panel-close";
+    closeBtn.textContent = "×";
+    closeBtn.addEventListener("click", () => overlay.remove());
+    head.appendChild(closeBtn);
+    dialog.appendChild(head);
+
+    const form = document.createElement("form");
+    form.className = "dokki-search-form";
+    const input = document.createElement("input");
+    input.type = "search";
+    input.className = "dokki-search-input";
+    input.placeholder = "제목·저자·키워드";
+    form.appendChild(input);
+    const submit = document.createElement("button");
+    submit.type = "submit";
+    submit.className = "dokki-search-submit";
+    submit.textContent = "검색";
+    form.appendChild(submit);
+    dialog.appendChild(form);
+
+    const status = document.createElement("div");
+    status.className = "dokki-search-status";
+    dialog.appendChild(status);
+    const results = document.createElement("div");
+    results.className = "dokki-search-results";
+    dialog.appendChild(results);
+
+    overlay.appendChild(dialog);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    document.body.appendChild(overlay);
+    setTimeout(() => input.focus(), 50);
+
+    let currentAbort: AbortController | null = null;
+    const run = async () => {
+      const q = input.value.trim();
+      if (!q) return;
+      currentAbort?.abort();
+      currentAbort = new AbortController();
+      results.innerHTML = "";
+      status.textContent = "검색 중…";
+      submit.disabled = true;
+      try {
+        const data = await searchBooks(q, currentAbort.signal);
+        submit.disabled = false;
+        if (!data.results.length) {
+          status.textContent = "검색 결과 없음.";
+          return;
+        }
+        status.textContent = `${data.total}건 중 ${data.results.length}건 표시`;
+        for (const r of data.results) results.appendChild(renderWishCard(r));
+      } catch (e) {
+        submit.disabled = false;
+        if ((e as Error).name !== "AbortError") status.textContent = "검색 실패.";
+      }
+    };
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      void run();
+    });
+
+    function renderWishCard(r: NlBookResult): HTMLElement {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "dokki-search-card";
+      if (r.coverUrl) {
+        const img = document.createElement("img");
+        img.className = "dokki-search-card-cover";
+        img.src = r.coverUrl;
+        img.alt = "";
+        card.appendChild(img);
+      }
+      const text = document.createElement("div");
+      text.className = "dokki-search-card-text";
+      const t = document.createElement("div");
+      t.className = "dokki-search-card-title";
+      t.textContent = r.title;
+      text.appendChild(t);
+      const sub = document.createElement("div");
+      sub.className = "dokki-search-card-sub";
+      sub.textContent = [r.author, r.publisher, r.pubYear].filter(Boolean).join(" · ");
+      text.appendChild(sub);
+      card.appendChild(text);
+      card.addEventListener("click", () => {
+        addWishlist({
+          id: r.isbn || r.controlNo || `${r.title}|${r.author ?? ""}`,
+          title: r.title,
+          author: r.author,
+        });
+        renderWishlist();
+        card.classList.add("is-added");
+        card.disabled = true;
+      });
+      return card;
+    }
+  }
+
   function renderAll() {
     mount.classList.toggle("dokki-demo", isDemo);
     renderExcerpt(excerptWrap, books, (b, focus) => openNote(b, focus));
@@ -1055,6 +1222,7 @@ export function mountWebView({
     renderStack();
     renderAuthSlot();
     renderUploadSlot();
+    renderWishlist();
   }
 
   renderAll();
