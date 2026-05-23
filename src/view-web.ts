@@ -975,15 +975,18 @@ export function mountWebView({
     actions.appendChild(save);
     dialog.appendChild(actions);
 
+    let dragFrom = -1;
     const renderChips = () => {
       field.querySelectorAll(".dokki-tagedit-chip").forEach((n) => n.remove());
       current.forEach((t, i) => {
         const chip = document.createElement("span");
         chip.className = "dokki-tagedit-chip";
+        chip.draggable = true;
         chip.textContent = t;
         const x = document.createElement("button");
         x.type = "button";
         x.textContent = "×";
+        x.draggable = false; // let the × click through instead of starting a drag
         x.addEventListener("click", () => {
           current.splice(i, 1);
           renderChips();
@@ -992,6 +995,36 @@ export function mountWebView({
           input.focus();
         });
         chip.appendChild(x);
+        // Drag-to-reorder.
+        chip.addEventListener("dragstart", (e) => {
+          dragFrom = i;
+          chip.classList.add("is-dragging");
+          e.dataTransfer?.setData("text/plain", String(i));
+          if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+        });
+        chip.addEventListener("dragend", () => {
+          dragFrom = -1;
+          field
+            .querySelectorAll(".dokki-tagedit-chip")
+            .forEach((n) => n.classList.remove("is-dragging", "is-drop-target"));
+        });
+        chip.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+          if (dragFrom !== i) chip.classList.add("is-drop-target");
+        });
+        chip.addEventListener("dragleave", () => chip.classList.remove("is-drop-target"));
+        chip.addEventListener("drop", (e) => {
+          e.preventDefault();
+          chip.classList.remove("is-drop-target");
+          if (dragFrom < 0 || dragFrom === i) return;
+          const [moved] = current.splice(dragFrom, 1);
+          current.splice(i, 0, moved);
+          dragFrom = -1;
+          renderChips();
+          renderSugg();
+          renderRec();
+        });
         field.insertBefore(chip, input);
       });
     };

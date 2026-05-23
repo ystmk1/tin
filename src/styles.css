@@ -1343,7 +1343,11 @@ html.dokki-no-splash #dokki-splash { display: none; }
   padding: 3px 6px 3px 10px;
   font-size: 0.78rem;
   white-space: nowrap;
+  cursor: grab;
 }
+.dokki-tagedit-chip:active { cursor: grabbing; }
+.dokki-tagedit-chip.is-dragging { opacity: 0.4; }
+.dokki-tagedit-chip.is-drop-target { box-shadow: inset 0 0 0 2px var(--interactive-accent, #5b7cff); }
 .dokki-tagedit-chip button {
   border: none;
   background: none;
