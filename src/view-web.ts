@@ -931,13 +931,7 @@ export function mountWebView({
   function renderNonfiction() {
     nonfictionWrap.innerHTML = "";
     const pool = filtered(state, books).filter(isNonfiction);
-    if (!pool.length) return; // empty section just disappears (no header)
-    const head = document.createElement("div");
-    head.className = "dokki-nonfiction-head";
-    const ttl = document.createElement("span");
-    ttl.textContent = "비문학 발췌";
-    head.appendChild(ttl);
-    nonfictionWrap.appendChild(head);
+    if (!pool.length) return;
 
     const list = document.createElement("div");
     list.className = "dokki-nonfiction-list";
