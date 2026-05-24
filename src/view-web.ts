@@ -105,6 +105,12 @@ export function mountWebView({
   stackWrap.className = "dokki-stack-wrap";
   mount.appendChild(stackWrap);
 
+  // 비문학(non-fiction) excerpts — a collection of short prose pieces, between
+  // the book stack and the wishlist. Lower hierarchy than the stack (compact
+  // rows, no covers), higher than the wishlist (preview text, opens a panel).
+  const nonfictionWrap = document.createElement("section");
+  nonfictionWrap.className = "dokki-nonfiction";
+
   // "읽고 싶은 도서" — sits below the book stack, above the GitHub footer.
   const wishWrap = document.createElement("section");
   wishWrap.className = "dokki-wishlist";
@@ -188,6 +194,7 @@ export function mountWebView({
   repoLink.rel = "noopener";
   repoLink.textContent = "GitHub →";
   footer.appendChild(repoLink);
+  mount.appendChild(nonfictionWrap); // 비문학 발췌, between the stack and the wishlist
   mount.appendChild(wishWrap); // want-to-read list, just above the footer
   mount.appendChild(footer);
 
@@ -314,6 +321,31 @@ export function mountWebView({
       pagesEl.appendChild(block);
     }
     inner.appendChild(pagesEl);
+
+    // Backlinks — other notes that wikilink (`[[Title]]` / `![[Title]]`) to
+    // this one. Especially useful for the 비문학 excerpts, which are usually
+    // referenced from related notes.
+    const incoming = backlinksFor(b, books);
+    if (incoming.length) {
+      const bl = document.createElement("section");
+      bl.className = "dokki-backlinks";
+      const lbl = document.createElement("h4");
+      lbl.textContent = "이 노트를 인용한 노트";
+      bl.appendChild(lbl);
+      const ul = document.createElement("ul");
+      for (const other of incoming) {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.className = "dokki-wikilink";
+        a.dataset.target = other.title;
+        a.textContent = other.title;
+        li.appendChild(a);
+        ul.appendChild(li);
+      }
+      bl.appendChild(ul);
+      inner.appendChild(bl);
+    }
+
     panel.classList.add("is-open");
     panelBackdrop.classList.add("is-open");
     // Lock the background so the wheel scrolls the note, not the main page
@@ -848,7 +880,7 @@ export function mountWebView({
     stackWrap.appendChild(marquee);
     renderBookStack(
       stackWrap,
-      filtered(state, books),
+      filtered(state, books).filter((b) => !isNonfiction(b)),
       (path) => {
         if (suppressOpen) {
           suppressOpen = false; // swallow the click that ended a marquee drag
@@ -873,6 +905,46 @@ export function mountWebView({
         },
       },
     );
+  }
+
+  function renderNonfiction() {
+    nonfictionWrap.innerHTML = "";
+    const pool = filtered(state, books).filter(isNonfiction);
+    if (!pool.length) return; // empty section just disappears (no header)
+    const head = document.createElement("div");
+    head.className = "dokki-nonfiction-head";
+    const ttl = document.createElement("span");
+    ttl.textContent = "비문학 발췌";
+    head.appendChild(ttl);
+    nonfictionWrap.appendChild(head);
+
+    const list = document.createElement("div");
+    list.className = "dokki-nonfiction-list";
+    for (const b of pool) {
+      const row = document.createElement("article");
+      row.className = "dokki-nf-row";
+      row.dataset.path = b.filePath;
+      const ttlEl = document.createElement("div");
+      ttlEl.className = "dokki-nf-title";
+      ttlEl.textContent = b.title;
+      row.appendChild(ttlEl);
+      const preview = bodyPreview(b);
+      if (preview) {
+        const pv = document.createElement("div");
+        pv.className = "dokki-nf-preview";
+        pv.textContent = preview;
+        row.appendChild(pv);
+      }
+      row.addEventListener("click", () => openNote(b));
+      if (!isDemoPath(b.filePath)) {
+        row.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          openSpineMenu(b, e.clientX, e.clientY);
+        });
+      }
+      list.appendChild(row);
+    }
+    nonfictionWrap.appendChild(list);
   }
 
   function openSpineMenu(b: BookNote, x: number, y: number) {
@@ -1176,6 +1248,7 @@ export function mountWebView({
     const next = renderControls(state, books, {
       onSearchOrFilter: () => {
         renderStack();
+        renderNonfiction();
         updateGraphHighlight();
       },
       onGraphBasisChange: () => {
@@ -1494,6 +1567,7 @@ export function mountWebView({
     renderControlsBar();
     renderGraphSection();
     renderStack();
+    renderNonfiction();
     renderAuthSlot();
     renderUploadSlot();
     renderWishlist();
@@ -2005,6 +2079,59 @@ const ITALIC_HTML = /\*([^*\n]+?)\*/g;
 // → "민음사 세계문학전집"). The underscore stays in the stored/matched value.
 function tagLabel(t: string): string {
   return t.replace(/_/g, " ");
+}
+
+// 비문학(non-fiction) excerpts are collected into their own section between
+// the book stack and the wishlist. Classified purely by the `비문학` tag in
+// the note's frontmatter — no special upload step.
+function isNonfiction(b: BookNote): boolean {
+  return b.frontmatter.tags.includes("비문학");
+}
+
+// A short, plain-text preview of a note's body for the non-fiction card —
+// strips wikilink/embed/bold/italic markup and collapses whitespace.
+function bodyPreview(b: BookNote, max = 140): string {
+  const raw =
+    b.preamble ||
+    b.externalQuote ||
+    b.pages.map((p) => p.body).find((s) => s.trim()) ||
+    "";
+  const text = raw
+    .replace(/!?\[\[([^\][|#]+)(?:[|#][^\][]*)?\]\]/g, "$1") // [[Note]] / ![[..]]
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // ![alt](url) images
+    .replace(/\*\*([^*]+)\*\*/g, "$1") // **bold**
+    .replace(/\*([^*\n]+)\*/g, "$1") // *italic*
+    .replace(/^###[ \t]+/gm, "") // ### heading prefix
+    .replace(/^>\s?/gm, "") // > quote prefix
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > max ? text.slice(0, max - 1).trimEnd() + "…" : text;
+}
+
+// Notes that wikilink (`[[Title]]` / `![[Title]]`) to this one — shown as a
+// backlinks section at the bottom of the panel. These collected excerpts are
+// usually referenced from related notes, so the connection should be visible.
+const WIKILINK_ANY = /!?\[\[([^\][]+)\]\]/g;
+function backlinksFor(book: BookNote, all: BookNote[]): BookNote[] {
+  const out: BookNote[] = [];
+  for (const other of all) {
+    if (other.filePath === book.filePath) continue;
+    const text = [
+      other.externalQuote ?? "",
+      other.preamble ?? "",
+      ...other.pages.map((p) => p.body),
+    ].join("\n");
+    WIKILINK_ANY.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = WIKILINK_ANY.exec(text)) !== null) {
+      const name = m[1].split("|")[0].split("#")[0].trim();
+      if (name === book.title) {
+        out.push(other);
+        break;
+      }
+    }
+  }
+  return out;
 }
 
 const SUBHEADING_HTML = /^###[ \t]+(.+?)[ \t]*$/gm;

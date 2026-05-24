@@ -965,6 +965,71 @@ html.dokki-no-splash #dokki-splash { display: none; }
 .dokki-panel-external em { font-style: italic; }
 .dokki-panel-external strong { font-weight: 600; }
 
+/* === 비문학 발췌 — between the book stack and the wishlist. Hierarchy: less
+   prominent than the book spines (no covers, compact rows), more prominent
+   than the wishlist (preview text, larger titles, clickable cards). === */
+.dokki-nonfiction {
+  margin: 36px 0 0;
+  font-family: var(--font-ui);
+}
+.dokki-nonfiction-head {
+  display: flex;
+  align-items: center;
+  padding: 0 2px 8px;
+  margin-bottom: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: -0.01em;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.dokki-nonfiction-list {
+  display: flex;
+  flex-direction: column;
+}
+.dokki-nf-row {
+  padding: 12px 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.12s;
+}
+.dokki-nf-row + .dokki-nf-row { border-top: 1px dashed var(--background-modifier-border); }
+.dokki-nf-row:hover { background: var(--background-secondary); }
+.dokki-nf-title {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--text-normal);
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+}
+.dokki-nf-preview {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Backlinks at the bottom of an open note panel. */
+.dokki-backlinks {
+  margin: 64px 0 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+  font-family: var(--font-ui);
+}
+.dokki-backlinks h4 {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--text-faint);
+  margin: 0 0 8px;
+  letter-spacing: 0.02em;
+}
+.dokki-backlinks ul { list-style: none; margin: 0; padding: 0; }
+.dokki-backlinks li { padding: 4px 0; font-size: 0.86rem; }
+
 /* === 읽고 싶은 도서 — list below the book stack, above the footer === */
 .dokki-wishlist {
   margin: 44px 0 0;
