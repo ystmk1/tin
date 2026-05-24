@@ -969,17 +969,21 @@ html.dokki-no-splash #dokki-splash { display: none; }
    prominent than the book spines (no covers, compact rows), more prominent
    than the wishlist (preview text, larger titles, clickable cards). === */
 .dokki-nonfiction {
-  margin: 36px 0 0;
+  /* Clear break from the book stack above: large top gap + section divider so
+     it reads as its own 단(tier), not the tail of the stack. */
+  margin: 96px 0 0;
+  padding-top: 28px;
+  border-top: 2px solid var(--background-modifier-border);
   font-family: var(--font-ui);
 }
 .dokki-nonfiction-head {
   display: flex;
   align-items: center;
-  padding: 0 2px 8px;
-  margin-bottom: 8px;
-  font-size: 0.82rem;
+  padding: 0 2px 14px;
+  margin-bottom: 14px;
+  font-size: 1.02rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-normal);
   letter-spacing: -0.01em;
   border-bottom: 1px solid var(--background-modifier-border);
 }

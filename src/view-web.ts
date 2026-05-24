@@ -247,7 +247,9 @@ export function mountWebView({
     inner.appendChild(head);
     renderHead(head, b);
 
-    const status = statusChipText(b);
+    // Status chip is suppressed for 비문학 (treat as if not set, per the
+    // user's note that author/status are book-specific).
+    const status = isNonfiction(b) ? "" : statusChipText(b);
     const noteTags = effectiveTags(b);
     if (status || noteTags.length > 0) {
       const tags = document.createElement("div");
@@ -377,6 +379,25 @@ export function mountWebView({
 
   function renderHead(head: HTMLElement, b: BookNote) {
     head.innerHTML = "";
+
+    // 비문학 발췌는 책이 아니라서 표지·서지·검색 버튼이 의미 없음.
+    // 제목(과 별점)만 보여주고 나머지는 전부 생략.
+    if (isNonfiction(b)) {
+      const titleWrap = document.createElement("div");
+      titleWrap.className = "dokki-panel-title-wrap";
+      const titleRow = document.createElement("div");
+      titleRow.className = "dokki-panel-title-row";
+      const title = document.createElement("h2");
+      title.textContent = b.title;
+      titleRow.appendChild(title);
+      if (b.frontmatter.rating !== undefined && b.frontmatter.rating > 0) {
+        titleRow.appendChild(renderRatingEl(b.frontmatter.rating));
+      }
+      titleWrap.appendChild(titleRow);
+      head.appendChild(titleWrap);
+      return;
+    }
+
     const meta = getMetadata(b.filePath);
 
     if (meta) {
