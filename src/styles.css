@@ -9,6 +9,9 @@
   --text-muted: #6b6b66;
   --text-faint: #999692;
   --interactive-accent: #5a6b4a;
+  /* Calm slate-blue for [[wikilinks]] / backlinks — clearly clickable on the
+     parchment background without being neon. */
+  --dokki-link: #4a6fa5;
   --font-display: "Pretendard Variable", "Pretendard", -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   --font-text: "Pretendard Variable", "Pretendard", -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   --font-ui: "Pretendard Variable", "Pretendard", ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
@@ -22,6 +25,7 @@
     --text-muted: #8a8884;
     --text-faint: #555550;
     --interactive-accent: #9bb38a;
+    --dokki-link: #8fb4e8; /* lighter blue so it stays legible on dark bg */
   }
 }
 
@@ -955,12 +959,13 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 .dokki-panel-body .dokki-subheading:first-child { margin-top: 0; }
 .dokki-wikilink {
-  color: var(--interactive-accent, #5b7cff);
+  color: var(--dokki-link, #4a6fa5);
+  font-weight: 500;
   text-decoration: none;
-  border-bottom: 1px solid transparent;
+  border-bottom: 1px solid currentColor;
   cursor: pointer;
 }
-.dokki-wikilink:hover { border-bottom-color: currentColor; }
+.dokki-wikilink:hover { opacity: 0.78; }
 .dokki-panel-body em,
 .dokki-panel-external em { font-style: italic; }
 .dokki-panel-external strong { font-weight: 600; }
