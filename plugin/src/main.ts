@@ -1,6 +1,5 @@
 import {
   Plugin,
-  WorkspaceLeaf,
   PluginSettingTab,
   Setting,
   App,
@@ -8,35 +7,57 @@ import {
   Notice,
   Editor,
 } from "obsidian";
-import { DokkiView, VIEW_TYPE_DOKKI } from "./view";
 import { findPageFixes, applyPageFixes, type PageFix } from "./format";
+import {
+  SupabaseService,
+  DEFAULT_SUPABASE_SETTINGS,
+  type SupabaseSettings,
+} from "./supabase-client";
+import { runSync, showSyncResult, type SyncHashes } from "./sync";
 
-interface DokkiSettings {
+interface DokkiSettings extends SupabaseSettings {
   notesFolder: string;
+  /** Mirror local deletions to the cloud. Off by default — safer. */
+  deleteRemoved: boolean;
+  /** Per-filename SHA-256 of the last successfully uploaded content. */
+  syncHashes: SyncHashes;
 }
 
 const DEFAULT_SETTINGS: DokkiSettings = {
+  ...DEFAULT_SUPABASE_SETTINGS,
   notesFolder: "",
+  deleteRemoved: false,
+  syncHashes: {},
 };
 
 export default class DokkiPlugin extends Plugin {
   settings!: DokkiSettings;
+  supabase!: SupabaseService;
 
   async onload() {
     await this.loadSettings();
-
-    this.registerView(VIEW_TYPE_DOKKI, (leaf) => new DokkiView(leaf, this.settings.notesFolder));
-
-    this.addRibbonIcon("book-open", "DoKKi 열기", () => this.activateView());
-    this.addCommand({
-      id: "dokki-open",
-      name: "DoKKi 탐색기 열기",
-      callback: () => this.activateView(),
+    this.supabase = new SupabaseService(this.settings, async (s) => {
+      Object.assign(this.settings, s);
+      await this.saveSettings();
     });
+
+    // OAuth callback — Supabase redirects the browser to obsidian://dokki-auth?code=…
+    this.registerObsidianProtocolHandler("dokki-auth", (params) => {
+      const code = params.code;
+      if (!code) {
+        new Notice("로그인 콜백에 code가 없습니다.");
+        return;
+      }
+      void this.supabase.completeOAuth(code);
+    });
+
+    // Ribbon = quick sync (the in-Obsidian explorer view has been retired —
+    // the canonical viewer is the DoKKi web app).
+    this.addRibbonIcon("refresh-cw", "DoKKi 동기화", () => void this.syncNow());
     this.addCommand({
-      id: "dokki-reload",
-      name: "DoKKi 노트 다시 읽기",
-      callback: () => this.reloadAllViews(),
+      id: "dokki-sync",
+      name: "DoKKi 동기화 (변경된 노트만 업로드)",
+      callback: () => void this.syncNow(),
     });
     this.addCommand({
       id: "dokki-fix-page-format",
@@ -56,13 +77,6 @@ export default class DokkiPlugin extends Plugin {
     });
 
     this.addSettingTab(new DokkiSettingTab(this.app, this));
-
-    // Re-parse when vault changes
-    const reloadDebounced = debounce(() => this.reloadAllViews(), 600);
-    this.registerEvent(this.app.vault.on("modify", reloadDebounced));
-    this.registerEvent(this.app.vault.on("create", reloadDebounced));
-    this.registerEvent(this.app.vault.on("delete", reloadDebounced));
-    this.registerEvent(this.app.vault.on("rename", reloadDebounced));
   }
 
   onunload() {}
@@ -75,34 +89,28 @@ export default class DokkiPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  private async activateView() {
-    const { workspace } = this.app;
-    let leaf: WorkspaceLeaf | null = null;
-    const existing = workspace.getLeavesOfType(VIEW_TYPE_DOKKI);
-    if (existing.length) {
-      leaf = existing[0];
-    } else {
-      leaf = workspace.getLeaf("tab");
-      await leaf.setViewState({ type: VIEW_TYPE_DOKKI, active: true });
+  async syncNow(): Promise<void> {
+    const client = this.supabase.getClient();
+    if (!client) {
+      new Notice("Supabase URL / anon key를 먼저 설정해 주세요.");
+      return;
     }
-    workspace.revealLeaf(leaf);
-  }
-
-  private reloadAllViews() {
-    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_DOKKI)) {
-      const v = leaf.view as DokkiView;
-      v.reload();
+    const userId = await this.supabase.getUserId();
+    if (!userId) {
+      new Notice("로그인이 필요합니다. 설정 → DoKKi 에서 로그인하세요.");
+      return;
     }
+    new Notice("DoKKi 동기화 중…");
+    const result = await runSync(this.app, client, userId, this.settings.syncHashes, {
+      folder: this.settings.notesFolder,
+      deleteRemoved: this.settings.deleteRemoved,
+    });
+    this.settings.syncHashes = result.newHashes;
+    await this.saveSettings();
+    showSyncResult(result);
   }
 }
 
-function debounce(fn: () => void, ms: number): () => void {
-  let t: ReturnType<typeof setTimeout> | null = null;
-  return () => {
-    if (t) clearTimeout(t);
-    t = setTimeout(fn, ms);
-  };
-}
 
 // Preview the suggested page-marker fixes before applying them.
 class PageFixModal extends Modal {
@@ -151,11 +159,14 @@ class DokkiSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: DokkiPlugin) {
     super(app, plugin);
   }
+
   display() {
-    this.containerEl.empty();
-    new Setting(this.containerEl)
-      .setName("노트 폴더")
-      .setDesc("발췌 노트가 들어있는 vault 내 폴더 경로 (비우면 전체 vault 검색).")
+    const c = this.containerEl;
+    c.empty();
+
+    new Setting(c)
+      .setName("동기화 대상 폴더")
+      .setDesc("이 폴더 아래의 .md 파일만 클라우드와 동기화합니다. 비우면 vault 전체.")
       .addText((t) =>
         t
           .setPlaceholder("예: notes")
@@ -164,6 +175,125 @@ class DokkiSettingTab extends PluginSettingTab {
             this.plugin.settings.notesFolder = v.trim();
             await this.plugin.saveSettings();
           }),
+      );
+
+    c.createEl("h3", { text: "클라우드 동기화" });
+    c.createEl("p", {
+      text: "Supabase 프로젝트의 URL과 anon key를 입력하고 로그인하면, 변경된 노트만 클라우드(notes 테이블)에 업로드합니다.",
+      cls: "setting-item-description",
+    });
+
+    new Setting(c)
+      .setName("Supabase URL")
+      .addText((t) =>
+        t
+          .setPlaceholder("https://xxxxx.supabase.co")
+          .setValue(this.plugin.settings.supabaseUrl)
+          .onChange(async (v) => {
+            this.plugin.settings.supabaseUrl = v.trim();
+            this.plugin.supabase.invalidate();
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(c)
+      .setName("Supabase anon key")
+      .addText((t) =>
+        t
+          .setPlaceholder("ey…")
+          .setValue(this.plugin.settings.supabaseAnonKey)
+          .onChange(async (v) => {
+            this.plugin.settings.supabaseAnonKey = v.trim();
+            this.plugin.supabase.invalidate();
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    // Live status — readers can tell at a glance whether the plugin actually
+    // has a usable session.
+    const status = c.createDiv({ cls: "setting-item-description" });
+    status.style.padding = "4px 0 12px";
+    const refreshStatus = async () => {
+      const who = await this.plugin.supabase.signedInAs();
+      status.setText(who ? `로그인됨: ${who}` : "현재 로그아웃 상태");
+      status.style.color = who ? "var(--text-success, #4caf50)" : "var(--text-muted)";
+    };
+    void refreshStatus();
+
+    new Setting(c)
+      .setName("로그인 (OAuth)")
+      .setDesc(
+        "브라우저에서 로그인을 마치면 obsidian://dokki-auth 콜백으로 자동 복귀합니다. ① Supabase Dashboard → Authentication → URL Configuration → Redirect URLs에 'obsidian://dokki-auth'를 먼저 등록해야 합니다. ② 콜백이 안 잡히면 아래 '세션 붙여넣기'로 우회.",
+      )
+      .addButton((b) =>
+        b.setButtonText("Google").onClick(() => void this.plugin.supabase.signIn("google")),
+      )
+      .addButton((b) =>
+        b.setButtonText("Kakao").onClick(() => void this.plugin.supabase.signIn("kakao")),
+      )
+      .addButton((b) =>
+        b.setButtonText("상태 새로고침").onClick(() => void refreshStatus()),
+      )
+      .addButton((b) =>
+        b.setButtonText("로그아웃").onClick(async () => {
+          await this.plugin.supabase.signOut();
+          await refreshStatus();
+          new Notice("로그아웃했습니다.");
+        }),
+      );
+
+    // Paste-session fallback: copy the `sb-<project>-auth-token` value from
+    // the web app's localStorage and drop it here. Bypasses OAuth entirely.
+    let pasted = "";
+    new Setting(c)
+      .setName("세션 붙여넣기 (OAuth 우회)")
+      .setDesc(
+        "웹 DoKKi에서 로그인 → 개발자 도구 → Application → Local Storage → 'sb-...-auth-token' 값(JSON)을 복사해 붙여넣고 [적용].",
+      )
+      .addTextArea((t) => {
+        t.inputEl.rows = 3;
+        t.inputEl.style.width = "100%";
+        t.setPlaceholder('{"access_token":"…","refresh_token":"…",…}');
+        t.onChange((v) => (pasted = v));
+      })
+      .addButton((b) =>
+        b.setButtonText("적용").onClick(async () => {
+          await this.plugin.supabase.setSessionFromJson(pasted);
+          await refreshStatus();
+        }),
+      );
+
+    new Setting(c)
+      .setName("vault에서 삭제된 노트는 클라우드에서도 삭제")
+      .setDesc(
+        "끄면(기본) 클라우드에는 그대로 남습니다. 켜기 전에 vault에 모든 노트가 있는지 확인하세요 — 실수로 켜면 클라우드 노트가 사라질 수 있습니다.",
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.deleteRemoved).onChange(async (v) => {
+          this.plugin.settings.deleteRemoved = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(c)
+      .setName("지금 동기화")
+      .setDesc("변경된 노트만 한 번에 업로드합니다.")
+      .addButton((b) =>
+        b
+          .setButtonText("동기화")
+          .setCta()
+          .onClick(() => void this.plugin.syncNow()),
+      );
+
+    new Setting(c)
+      .setName("해시 캐시 초기화")
+      .setDesc("다음 동기화에서 모든 노트를 다시 업로드합니다(전체 재업로드용).")
+      .addButton((b) =>
+        b.setButtonText("초기화").onClick(async () => {
+          this.plugin.settings.syncHashes = {};
+          await this.plugin.saveSettings();
+          new Notice("해시 캐시를 비웠습니다.");
+        }),
       );
   }
 }
