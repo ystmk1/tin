@@ -150,6 +150,7 @@ interface ParsedBody {
 }
 
 function parseBody(body: string): ParsedBody {
+  body = stripObsidianComments(body);
   const lines = body.split(/\r?\n/);
   const externalQuoteLines: string[] = [];
   const preambleLines: string[] = [];
@@ -200,6 +201,19 @@ function parseBody(body: string): ParsedBody {
   const externalQuote = trimBlankEdges(externalQuoteLines).join("\n") || undefined;
   const preamble = fixStrayBold(trimBlankEdges(preambleLines).join("\n")) || undefined;
   return { externalQuote, preamble, pages };
+}
+
+/**
+ * Strip Obsidian-style hidden comments: `%%...%%` (multi-line allowed). Lines
+ * that are only a comment are removed wholesale (incl. their trailing newline)
+ * so nothing leaves a blank gap behind; inline comments collapse to nothing.
+ * Runs before any other body parsing so downstream stages (bold excerpts,
+ * embeds, page index) never even see commented content.
+ */
+function stripObsidianComments(body: string): string {
+  return body
+    .replace(/^[ \t]*%%[\s\S]*?%%[ \t]*\r?\n?/gm, "")
+    .replace(/%%[\s\S]*?%%/g, "");
 }
 
 function finalizePage(page: number, lines: string[]): PageExcerpt {
