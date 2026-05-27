@@ -21,7 +21,7 @@ export async function loadBooks(): Promise<LoadedNotes> {
   if (supabase && user) {
     const { data, error } = await supabase
       .from("notes")
-      .select("filename, content, updated_at")
+      .select("filename, content, updated_at, is_fragment")
       .eq("user_id", user.id);
     if (error) {
       console.warn("[notes] cloud load failed, showing demo:", error.message);
@@ -30,7 +30,11 @@ export async function loadBooks(): Promise<LoadedNotes> {
     const rows = data ?? [];
     if (rows.length === 0) return { books: demoBooks(), isDemo: true };
     const books = rows
-      .map((r) => safeParse(r.filename as string, r.content as string))
+      .map((r) => {
+        const b = safeParse(r.filename as string, r.content as string);
+        if (b) b.isFragment = (r as { is_fragment?: boolean }).is_fragment === true;
+        return b;
+      })
       .filter((b): b is BookNote => b !== null);
     return { books, isDemo: false };
   }

@@ -17,6 +17,8 @@ import { runSync, showSyncResult, type SyncHashes } from "./sync";
 
 interface DokkiSettings extends SupabaseSettings {
   notesFolder: string;
+  /** Files inside this folder are uploaded as 조각글 (is_fragment = true). */
+  fragmentFolder: string;
   /** Mirror local deletions to the cloud. Off by default — safer. */
   deleteRemoved: boolean;
   /** Per-filename SHA-256 of the last successfully uploaded content. */
@@ -26,6 +28,7 @@ interface DokkiSettings extends SupabaseSettings {
 const DEFAULT_SETTINGS: DokkiSettings = {
   ...DEFAULT_SUPABASE_SETTINGS,
   notesFolder: "",
+  fragmentFolder: "",
   deleteRemoved: false,
   syncHashes: {},
 };
@@ -103,6 +106,7 @@ export default class DokkiPlugin extends Plugin {
     new Notice("DoKKi 동기화 중…");
     const result = await runSync(this.app, client, userId, this.settings.syncHashes, {
       folder: this.settings.notesFolder,
+      fragmentFolder: this.settings.fragmentFolder,
       deleteRemoved: this.settings.deleteRemoved,
     });
     this.settings.syncHashes = result.newHashes;
@@ -173,6 +177,21 @@ class DokkiSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.notesFolder)
           .onChange(async (v) => {
             this.plugin.settings.notesFolder = v.trim();
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(c)
+      .setName("조각 폴더")
+      .setDesc(
+        "이 폴더 아래의 .md는 책이 아니라 조각글(짧은 비문학 발췌)로 업로드되어 웹에서 책 스택 아래의 별도 단에 표시됩니다. 비우면 조각 분류 사용 안 함.",
+      )
+      .addText((t) =>
+        t
+          .setPlaceholder("예: 조각")
+          .setValue(this.plugin.settings.fragmentFolder)
+          .onChange(async (v) => {
+            this.plugin.settings.fragmentFolder = v.trim();
             await this.plugin.saveSettings();
           }),
       );

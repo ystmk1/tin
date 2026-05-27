@@ -2096,11 +2096,13 @@ function tagLabel(t: string): string {
   return t.replace(/_/g, " ");
 }
 
-// 비문학(non-fiction) excerpts are collected into their own section between
-// the book stack and the wishlist. Classified purely by the `비문학` tag in
-// the note's frontmatter — no special upload step.
+// 조각글(fragment) notes are collected into their own section between the
+// book stack and the wishlist. Classification is owned by the Obsidian plugin
+// — files in its configured fragment folder land in the cloud with
+// `is_fragment = true`. The frontmatter `비문학` tag no longer affects
+// placement (it's just an ordinary tag now — books can carry it freely).
 function isNonfiction(b: BookNote): boolean {
-  return b.frontmatter.tags.includes("비문학");
+  return b.isFragment === true;
 }
 
 // A short, plain-text preview of a note's body for the non-fiction card —

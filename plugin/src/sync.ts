@@ -19,6 +19,12 @@ export interface SyncHashes {
 export interface SyncOptions {
   /** "" = whole vault, else a folder path (matches Obsidian's TFile.path prefix). */
   folder: string;
+  /**
+   * Files inside this folder (relative to the vault root) sync as 조각글 —
+   * the cloud row gets `is_fragment = true` and the web shows them in the
+   * non-fiction strip instead of the book stack. Empty = no fragment folder.
+   */
+  fragmentFolder: string;
   /** Delete cloud rows whose local file has disappeared. Off by default — safer. */
   deleteRemoved: boolean;
 }
@@ -56,6 +62,13 @@ function nameOf(f: TFile): string {
   return f.name;
 }
 
+/** Does `f`'s vault path sit inside `folder` (or equal it)? */
+function inFolder(f: TFile, folder: string): boolean {
+  const prefix = folder.trim().replace(/^\/+|\/+$/g, "");
+  if (!prefix) return false;
+  return f.path === prefix || f.path.startsWith(prefix + "/");
+}
+
 export async function runSync(
   app: App,
   supabase: SupabaseClient,
@@ -91,7 +104,12 @@ export async function runSync(
   const cloudListOk = !listErr;
 
   const files = listMarkdown(app, opts.folder);
-  const rowsToUpsert: Array<{ user_id: string; filename: string; content: string }> = [];
+  const rowsToUpsert: Array<{
+    user_id: string;
+    filename: string;
+    content: string;
+    is_fragment: boolean;
+  }> = [];
   // Track which filenames we saw this run, so the local hash map can be
   // pruned and (optionally) cloud rows can be deleted.
   const seen = new Set<string>();
@@ -118,13 +136,19 @@ export async function runSync(
     }
 
     const hash = await sha256Hex(content);
+    const isFragment = inFolder(f, opts.fragmentFolder);
+    // Cache key encodes the fragment flag: moving a file in/out of the 조각
+    // folder must re-upload it (so the cloud row's is_fragment flips) even
+    // when the content hash is unchanged. `f:` prefix is the only marker;
+    // old plain-hash entries keep matching non-fragment notes after upgrade.
+    const cacheKey = isFragment ? `f:${hash}` : hash;
     const inCloud = cloudListOk ? cloudSet.has(filename) : true; // fall back to cache only
-    if (inCloud && storedHashes[filename] === hash) {
+    if (inCloud && storedHashes[filename] === cacheKey) {
       result.unchanged++;
       continue;
     }
-    rowsToUpsert.push({ user_id: userId, filename, content });
-    result.newHashes[filename] = hash;
+    rowsToUpsert.push({ user_id: userId, filename, content, is_fragment: isFragment });
+    result.newHashes[filename] = cacheKey;
   }
 
   // Single batch upsert — one HTTP round-trip for N changed notes.

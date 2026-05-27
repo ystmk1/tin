@@ -29,6 +29,13 @@ export interface BookNote {
   pages: PageExcerpt[];
   allBolds: BoldFragment[];
   status: ReadingStatus;
+  /**
+   * Marks a "조각글" — a short excerpt note synced from the Obsidian plugin's
+   * fragment folder. Drives placement in the bottom non-fiction strip instead
+   * of the book stack. Set per-row from `notes.is_fragment`; the frontmatter
+   * `비문학` tag no longer affects classification.
+   */
+  isFragment?: boolean;
 }
 
 export interface BoldFragment {
