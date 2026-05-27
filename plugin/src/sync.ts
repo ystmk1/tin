@@ -34,6 +34,10 @@ export interface SyncResult {
   removed: number;
   unchanged: number;
   skipped: number;
+  /** Files this run identified as 조각글 (inside the fragment folder). */
+  fragmentsDetected: number;
+  /** Echo of the fragment folder setting at run-time — easy to spot a typo. */
+  fragmentFolderUsed: string;
   newHashes: SyncHashes;
   errors: string[];
 }
@@ -48,13 +52,32 @@ async function sha256Hex(content: string): Promise<string> {
   return hex;
 }
 
-/** Gather .md files in the configured folder (or the whole vault when empty). */
-function listMarkdown(app: App, folder: string): TFile[] {
+/**
+ * Walks the vault once and classifies each .md as book / fragment / skip:
+ *   - in fragmentFolder → fragment (takes priority — a file inside the
+ *     fragment folder is a fragment even if it's also inside a wider book
+ *     folder above it)
+ *   - in bookFolder, or bookFolder is empty → book
+ *   - otherwise → skip (out of scope)
+ * Empty bookFolder behaves as "everything that isn't a fragment", matching
+ * the pre-fragment behavior; users who want strict two-folder mode set both.
+ */
+function classifyVault(
+  app: App,
+  bookFolder: string,
+  fragmentFolder: string,
+): Array<{ file: TFile; isFragment: boolean }> {
   const all = app.vault.getMarkdownFiles();
-  const prefix = folder.trim().replace(/^\/+|\/+$/g, "");
-  if (!prefix) return all;
-  const withSlash = prefix + "/";
-  return all.filter((f) => f.path === prefix || f.path.startsWith(withSlash));
+  const out: Array<{ file: TFile; isFragment: boolean }> = [];
+  for (const f of all) {
+    if (fragmentFolder && inFolder(f, fragmentFolder)) {
+      out.push({ file: f, isFragment: true });
+    } else if (!bookFolder || inFolder(f, bookFolder)) {
+      out.push({ file: f, isFragment: false });
+    }
+    // else: file lives outside both folders → skip
+  }
+  return out;
 }
 
 /** Filename only — matches what the web upload stores in `notes.filename`. */
@@ -81,6 +104,8 @@ export async function runSync(
     removed: 0,
     unchanged: 0,
     skipped: 0,
+    fragmentsDetected: 0,
+    fragmentFolderUsed: opts.fragmentFolder,
     newHashes: { ...storedHashes },
     errors: [],
   };
@@ -103,7 +128,7 @@ export async function runSync(
   }
   const cloudListOk = !listErr;
 
-  const files = listMarkdown(app, opts.folder);
+  const classified = classifyVault(app, opts.folder, opts.fragmentFolder);
   const rowsToUpsert: Array<{
     user_id: string;
     filename: string;
@@ -114,7 +139,7 @@ export async function runSync(
   // pruned and (optionally) cloud rows can be deleted.
   const seen = new Set<string>();
 
-  for (const f of files) {
+  for (const { file: f, isFragment } of classified) {
     const filename = nameOf(f);
     if (seen.has(filename)) {
       // Two files share a basename — the cloud schema can only store one
@@ -136,7 +161,7 @@ export async function runSync(
     }
 
     const hash = await sha256Hex(content);
-    const isFragment = inFolder(f, opts.fragmentFolder);
+    if (isFragment) result.fragmentsDetected++;
     // Cache key encodes the fragment flag: moving a file in/out of the 조각
     // folder must re-upload it (so the cloud row's is_fragment flips) even
     // when the content hash is unchanged. `f:` prefix is the only marker;
@@ -187,6 +212,7 @@ export async function runSync(
 export function formatSyncSummary(r: SyncResult): string {
   const parts = [`업로드 ${r.uploaded}`, `삭제 ${r.removed}`, `변경없음 ${r.unchanged}`];
   if (r.skipped) parts.push(`건너뜀 ${r.skipped}`);
+  parts.push(`조각 ${r.fragmentsDetected}`);
   let line = parts.join(" · ");
   if (r.errors.length) line += ` · 오류 ${r.errors.length}`;
   return line;
@@ -194,7 +220,11 @@ export function formatSyncSummary(r: SyncResult): string {
 
 export function showSyncResult(r: SyncResult): void {
   new Notice(`DoKKi 동기화: ${formatSyncSummary(r)}`);
+  // Always-visible diagnostic: shows what the plugin actually thought the
+  // fragment folder was — easiest way to spot a path-mismatch typo.
+  new Notice(`조각 폴더 설정값: "${r.fragmentFolderUsed || "(빈 값)"}"`, 6_000);
   if (r.errors.length) {
     console.warn("[DoKKi sync] errors:", r.errors);
+    new Notice(`첫 오류: ${r.errors[0]}`, 10_000);
   }
 }

@@ -169,11 +169,13 @@ class DokkiSettingTab extends PluginSettingTab {
     c.empty();
 
     new Setting(c)
-      .setName("동기화 대상 폴더")
-      .setDesc("이 폴더 아래의 .md 파일만 클라우드와 동기화합니다. 비우면 vault 전체.")
+      .setName("책 폴더")
+      .setDesc(
+        "책 노트가 들어있는 폴더 (예: 완독). 이 폴더 아래 .md는 책 스택에 업로드됩니다. 비우면 조각 폴더를 뺀 vault 전체가 책으로 취급됩니다.",
+      )
       .addText((t) =>
         t
-          .setPlaceholder("예: notes")
+          .setPlaceholder("예: 완독")
           .setValue(this.plugin.settings.notesFolder)
           .onChange(async (v) => {
             this.plugin.settings.notesFolder = v.trim();
@@ -184,7 +186,7 @@ class DokkiSettingTab extends PluginSettingTab {
     new Setting(c)
       .setName("조각 폴더")
       .setDesc(
-        "이 폴더 아래의 .md는 책이 아니라 조각글(짧은 비문학 발췌)로 업로드되어 웹에서 책 스택 아래의 별도 단에 표시됩니다. 비우면 조각 분류 사용 안 함.",
+        "조각글(짧은 비문학 발췌) 폴더 (예: 조각). 이 폴더 아래 .md는 책이 아니라 조각글로 업로드되어 웹에서 책 스택 아래 별도 단에 표시됩니다. 비우면 조각 분류 사용 안 함.",
       )
       .addText((t) =>
         t
