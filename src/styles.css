@@ -777,15 +777,22 @@ html.dokki-no-splash #dokki-splash { display: none; }
   line-height: 1.65;
   font-weight: 500;
   color: var(--text-normal);
-  background: linear-gradient(180deg, transparent 60%, hsla(45, 90%, 60%, 0.35) 60%);
+  background: none; /* highlight gradient is overkill when only bolds are shown */
   margin: 0 0 14px;
-  padding: 2px 4px;
+  padding: 0;
 }
 .dokki-panel.is-bold-only .dokki-panel-body strong em {
   font-style: italic;
 }
-/* Page numbers stay visible (their <h3> sits outside .dokki-panel-body). */
-.dokki-panel.is-bold-only .dokki-panel-pages section { margin-bottom: 28px; }
+/* Skip pages that have no bold excerpts — keeps the view focused on what was
+   actually highlighted. Modern :has() handles the check at the CSS layer. */
+.dokki-panel.is-bold-only .dokki-panel-pages section:not(:has(.dokki-panel-body strong)) {
+  display: none;
+}
+/* Wide air between page sections (so the boundary still reads); the bolds
+   inside a page stay close together via the strong's own margin. */
+.dokki-panel.is-bold-only .dokki-panel-pages section { margin-bottom: 64px; }
+.dokki-panel.is-bold-only .dokki-panel-pages section:last-child { margin-bottom: 0; }
 /* The 서평/comment/preamble blocks have no bold excerpts worth keeping; collapse. */
 .dokki-panel.is-bold-only .dokki-panel-comment,
 .dokki-panel.is-bold-only .dokki-panel-external,
