@@ -734,6 +734,63 @@ html.dokki-no-splash #dokki-splash { display: none; }
 }
 .dokki-panel-close:hover { color: var(--text-normal); }
 
+/* "볼드만" pill — sits next to the close button on the panel top-right. Stays
+   on both desktop and mobile (the TOC popover is hidden on mobile, so this
+   needs to remain reachable). */
+.dokki-bold-only-btn {
+  position: absolute;
+  top: 18px;
+  right: 56px;
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 99px;
+  padding: 4px 12px;
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  letter-spacing: -0.01em;
+  transition: all 0.12s;
+  z-index: 2;
+}
+.dokki-bold-only-btn:hover {
+  color: var(--text-normal);
+  border-color: var(--text-normal);
+}
+.dokki-bold-only-btn.is-active {
+  background: var(--text-normal);
+  color: var(--background-primary);
+  border-color: var(--text-normal);
+}
+
+/* Bold-only mode — hide everything in the body except `<strong>` highlights
+   and the page-number headers. font-size:0 on the pre collapses every text
+   node (and inherited spans) to invisible; <strong> restores its own size. */
+.dokki-panel.is-bold-only .dokki-panel-body {
+  font-size: 0;
+  line-height: 0;
+  color: transparent;
+}
+.dokki-panel.is-bold-only .dokki-panel-body strong {
+  display: block;
+  font-size: 0.98rem;
+  line-height: 1.65;
+  font-weight: 500;
+  color: var(--text-normal);
+  background: linear-gradient(180deg, transparent 60%, hsla(45, 90%, 60%, 0.35) 60%);
+  margin: 0 0 14px;
+  padding: 2px 4px;
+}
+.dokki-panel.is-bold-only .dokki-panel-body strong em {
+  font-style: italic;
+}
+/* Page numbers stay visible (their <h3> sits outside .dokki-panel-body). */
+.dokki-panel.is-bold-only .dokki-panel-pages section { margin-bottom: 28px; }
+/* The 서평/comment/preamble blocks have no bold excerpts worth keeping; collapse. */
+.dokki-panel.is-bold-only .dokki-panel-comment,
+.dokki-panel.is-bold-only .dokki-panel-external,
+.dokki-panel.is-bold-only .dokki-panel-preamble { display: none; }
+
 /* head: cover + title */
 .dokki-panel-head {
   display: flex;
@@ -1113,11 +1170,14 @@ html.dokki-no-splash #dokki-splash { display: none; }
   padding: 4px 4px 6px;
   font-family: var(--font-ui);
 }
-/* Slim grip bar — drag handle only, no label. */
+/* Slim grip bar with a faint "current / total" counter underneath. */
 .dokki-pageindex-head {
   cursor: move;
   user-select: none;
-  height: 12px;
+  flex-direction: column;
+  gap: 4px;
+  height: auto;
+  padding: 6px 0 2px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1128,6 +1188,13 @@ html.dokki-no-splash #dokki-splash { display: none; }
   height: 3px;
   border-radius: 2px;
   background: var(--background-modifier-border);
+}
+.dokki-pageindex-count {
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
 }
 /* 5 rows tall; the centre row is the current page, fading out top/bottom. */
 .dokki-pageindex-wheel {

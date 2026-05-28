@@ -240,6 +240,21 @@ export function mountWebView({
     close.addEventListener("click", () => closePanel());
     inner.appendChild(close);
 
+    // "볼드만" pill — collapses the panel to just the bold-highlighted excerpts
+    // (page numbers stay so you can navigate). Lives in the panel head so it's
+    // accessible on both desktop and mobile (the TOC popover is desktop-only).
+    const boldOnlyBtn = document.createElement("button");
+    boldOnlyBtn.type = "button";
+    boldOnlyBtn.className = "dokki-bold-only-btn";
+    boldOnlyBtn.textContent = "볼드만";
+    boldOnlyBtn.title = "볼드체 발췌만 보기";
+    boldOnlyBtn.addEventListener("click", () => {
+      const on = panel.classList.toggle("is-bold-only");
+      boldOnlyBtn.classList.toggle("is-active", on);
+      boldOnlyBtn.textContent = on ? "전체" : "볼드만";
+    });
+    inner.appendChild(boldOnlyBtn);
+
     // (Delete / edit-tags moved to the book-stack right-click context menu.)
 
     const head = document.createElement("div");
@@ -692,6 +707,7 @@ export function mountWebView({
 
   function closePanel() {
     panel.classList.remove("is-open");
+    panel.classList.remove("is-bold-only");
     panelBackdrop.classList.remove("is-open");
     document.documentElement.classList.remove("dokki-scroll-lock");
     pageIndex.style.display = "none";
@@ -758,11 +774,15 @@ export function mountWebView({
       pageIndex.style.display = "none";
       return;
     }
-    // Slim drag bar (no label) for moving the popover.
+    // Drag bar with a faint "current / total" counter. The drag affordance
+    // (the bar) stays the dominant visual; the counter sits centred under it.
     const head = document.createElement("div");
     head.className = "dokki-pageindex-head";
     pageIndex.appendChild(head);
     makeIndexDraggable(head);
+    const counter = document.createElement("span");
+    counter.className = "dokki-pageindex-count";
+    head.appendChild(counter);
 
     const wheel = document.createElement("div");
     wheel.className = "dokki-pageindex-wheel";
@@ -796,6 +816,7 @@ export function mountWebView({
       if (idx === current) return;
       current = idx;
       track.style.transform = `translateY(${(2 - idx) * PI_ROW}px)`;
+      counter.textContent = `${idx + 1} / ${items.length}`;
       items.forEach((el, i) => {
         const d = Math.abs(i - idx);
         el.style.opacity = d === 0 ? "1" : d === 1 ? "0.78" : d === 2 ? "0.5" : "0";
@@ -863,6 +884,29 @@ export function mountWebView({
       wheel.addEventListener("pointermove", move);
       wheel.addEventListener("pointerup", up);
     });
+    // Scrolling the mouse wheel over the popover spins it one page at a time
+    // and jumps the note panel along with it. Throttled so a fast flick still
+    // feels like discrete steps, and we pause the panel→wheel sync briefly so
+    // the two don't oscillate.
+    let wheelLast = 0;
+    wheel.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        const now = performance.now();
+        if (now - wheelLast < 110) return;
+        wheelLast = now;
+        const dir = e.deltaY > 0 ? 1 : -1;
+        const next = Math.max(0, Math.min(items.length - 1, current + dir));
+        if (next === current) return;
+        wheelDragging = true;
+        setCurrent(next);
+        scrollToPage(b.pages[next].page);
+        setTimeout(() => (wheelDragging = false), 140);
+      },
+      { passive: false },
+    );
+
     // Start with the first page centred (no spin), then enable the animation —
     // a focus-scroll or the reader scrolling will spin it from there.
     track.style.transition = "none";
