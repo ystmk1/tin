@@ -57,9 +57,14 @@ export function mountWebView({
   let suppressOpen = false; // a drag just happened — swallow the trailing click
 
   function applySelectionClasses() {
-    stackWrap.querySelectorAll<HTMLElement>(".dokki-spine").forEach((row) => {
-      row.classList.toggle("is-selected", !!row.dataset.path && selectedPaths.has(row.dataset.path));
-    });
+    const apply = (el: HTMLElement) => {
+      el.classList.toggle(
+        "is-selected",
+        !!el.dataset.path && selectedPaths.has(el.dataset.path),
+      );
+    };
+    stackWrap.querySelectorAll<HTMLElement>(".dokki-spine").forEach(apply);
+    nonfictionWrap.querySelectorAll<HTMLElement>(".dokki-nf-row").forEach(apply);
   }
   let controlsEl: HTMLElement | null = null;
 
@@ -172,14 +177,69 @@ export function mountWebView({
     window.addEventListener("pointerup", up);
   });
 
+  // Marquee drag-select for the 조각 cards too — same flow as the book stack
+  // (desktop-only, bulk delete via right-click).
+  const nfMarquee = document.createElement("div");
+  nfMarquee.className = "dokki-marquee";
+  nfMarquee.style.display = "none";
+  nonfictionWrap.appendChild(nfMarquee);
+
+  nonfictionWrap.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || !isCloudEnabled || !getUser()) return;
+    if (e.pointerType === "touch" || window.matchMedia("(max-width: 768px)").matches) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const fromRow = (e.target as HTMLElement).closest(".dokki-nf-row");
+    let moved = false;
+
+    const move = (ev: PointerEvent) => {
+      if (!moved && Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) < 6) return;
+      if (!moved) {
+        moved = true;
+        suppressOpen = true;
+        nfMarquee.style.display = "block";
+      }
+      const minX = Math.min(startX, ev.clientX);
+      const maxX = Math.max(startX, ev.clientX);
+      const minY = Math.min(startY, ev.clientY);
+      const maxY = Math.max(startY, ev.clientY);
+      const wr = nonfictionWrap.getBoundingClientRect();
+      nfMarquee.style.left = `${minX - wr.left}px`;
+      nfMarquee.style.top = `${minY - wr.top}px`;
+      nfMarquee.style.width = `${maxX - minX}px`;
+      nfMarquee.style.height = `${maxY - minY}px`;
+      selectedPaths.clear();
+      nonfictionWrap.querySelectorAll<HTMLElement>(".dokki-nf-row").forEach((row) => {
+        const r = row.getBoundingClientRect();
+        const hit = r.left < maxX && r.right > minX && r.top < maxY && r.bottom > minY;
+        const path = row.dataset.path;
+        if (hit && path && !isDemoPath(path)) selectedPaths.add(path);
+      });
+      applySelectionClasses();
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      nfMarquee.style.display = "none";
+      if (!moved && !fromRow && selectedPaths.size) {
+        selectedPaths.clear();
+        applySelectionClasses();
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  });
+
   // Pressing anywhere else clears the selection — except on an already-selected
-  // spine (so you can right-click it) or inside the context menu.
+  // spine / 조각 row (so you can right-click it) or inside the context menu.
   document.addEventListener("pointerdown", (e) => {
     if (!selectedPaths.size) return;
     const t = e.target as HTMLElement;
     if (t.closest(".dokki-ctx-menu")) return;
     const spine = t.closest(".dokki-spine") as HTMLElement | null;
     if (spine && spine.dataset.path && selectedPaths.has(spine.dataset.path)) return;
+    const nfRow = t.closest(".dokki-nf-row") as HTMLElement | null;
+    if (nfRow && nfRow.dataset.path && selectedPaths.has(nfRow.dataset.path)) return;
     selectedPaths.clear();
     applySelectionClasses();
   });
@@ -222,21 +282,24 @@ export function mountWebView({
     if (hit) openNote(hit);
   });
 
-  // Memo popover — in bold-only mode, clicking a `<strong>` excerpt opens a
-  // small textarea anchored next to that bold. Follows the bold as the panel
-  // scrolls; fades at the top/bottom of the panel viewport.
-  let memoState: {
+  // Memo popovers — in bold-only mode, every bold with a saved memo gets its
+  // own popover automatically; clicking a bold without one opens an empty
+  // popover for new notes. Each popover anchors to its bold and follows it
+  // as the panel scrolls; both fade at the top/bottom of the panel viewport.
+  interface MemoEntry {
     anchor: HTMLElement;
     filePath: string;
     boldText: string;
     popover: HTMLElement;
     textarea: HTMLTextAreaElement;
-  } | null = null;
+  }
+  const memoPopovers = new Map<HTMLElement, MemoEntry>();
 
-  function openMemoPopover(anchor: HTMLElement, filePath: string) {
-    closeMemoPopover();
+  function createMemoPopover(anchor: HTMLElement, filePath: string): MemoEntry | null {
+    const existing = memoPopovers.get(anchor);
+    if (existing) return existing;
     const boldText = (anchor.textContent ?? "").trim();
-    if (!boldText) return;
+    if (!boldText) return null;
 
     const popover = document.createElement("div");
     popover.className = "dokki-memo-popover";
@@ -247,6 +310,7 @@ export function mountWebView({
     popover.appendChild(ta);
     document.body.appendChild(popover);
 
+    const entry: MemoEntry = { anchor, filePath, boldText, popover, textarea: ta };
     const persist = () => {
       const v = ta.value;
       setMemo(filePath, boldText, v);
@@ -255,8 +319,7 @@ export function mountWebView({
     const autosize = () => {
       ta.style.height = "auto";
       ta.style.height = ta.scrollHeight + "px";
-      // The popover grew/shrank → re-anchor (fade boundary depends on size).
-      updateMemoPosition();
+      positionMemoEntry(entry); // size changed → re-anchor (fade depends on it)
     };
     ta.addEventListener("input", () => {
       persist();
@@ -264,40 +327,54 @@ export function mountWebView({
     });
     ta.addEventListener("blur", persist);
     ta.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") closeMemoPopover();
+      if (e.key === "Escape") removeMemoPopover(anchor);
     });
 
-    memoState = { anchor, filePath, boldText, popover, textarea: ta };
-    updateMemoPosition();
-    // Once attached we can read scrollHeight to set the initial height from
-    // saved content (single line when empty, taller when there's existing memo).
-    setTimeout(() => {
-      autosize();
-      ta.focus();
-    }, 20);
+    memoPopovers.set(anchor, entry);
+    positionMemoEntry(entry);
+    // After the element is in the DOM we can read scrollHeight for the
+    // initial autosize (one line when empty, taller for saved content).
+    setTimeout(() => autosize(), 0);
+    return entry;
   }
 
-  function closeMemoPopover() {
-    if (!memoState) return;
-    setMemo(memoState.filePath, memoState.boldText, memoState.textarea.value);
-    memoState.anchor.classList.toggle(
-      "has-memo",
-      memoState.textarea.value.trim().length > 0,
-    );
-    memoState.popover.remove();
-    memoState = null;
+  function removeMemoPopover(anchor: HTMLElement): void {
+    const e = memoPopovers.get(anchor);
+    if (!e) return;
+    setMemo(e.filePath, e.boldText, e.textarea.value);
+    e.anchor.classList.toggle("has-memo", e.textarea.value.trim().length > 0);
+    e.popover.remove();
+    memoPopovers.delete(anchor);
   }
 
-  function updateMemoPosition() {
-    if (!memoState) return;
-    const ar = memoState.anchor.getBoundingClientRect();
+  function removeAllMemoPopovers(): void {
+    for (const a of [...memoPopovers.keys()]) removeMemoPopover(a);
+  }
+
+  /** Drop only popovers whose textarea is empty — saved ones stay pinned. */
+  function removeEmptyMemoPopovers(): void {
+    for (const [a, e] of [...memoPopovers]) {
+      if (!e.textarea.value.trim()) removeMemoPopover(a);
+    }
+  }
+
+  /** Auto-open a popover for every bold that already has a saved memo. */
+  function showSavedMemoPopovers(): void {
+    if (!lastOpenedBook || !panel.classList.contains("is-bold-only")) return;
+    panel
+      .querySelectorAll<HTMLElement>(".dokki-panel-body strong.has-memo")
+      .forEach((el) => {
+        createMemoPopover(el, lastOpenedBook!.filePath);
+      });
+  }
+
+  function positionMemoEntry(e: MemoEntry): void {
+    const ar = e.anchor.getBoundingClientRect();
     const pr = panel.getBoundingClientRect();
-    const pop = memoState.popover;
+    const pop = e.popover;
     const popW = pop.offsetWidth;
     const popH = pop.offsetHeight;
 
-    // Prefer to sit on the panel's left flank. On narrow viewports there's no
-    // room there, so flip to floating above (or below) the anchor instead.
     let top: number;
     let left: number;
     if (pr.left >= popW + 24) {
@@ -311,8 +388,6 @@ export function mountWebView({
     pop.style.top = `${top}px`;
     pop.style.left = `${left}px`;
 
-    // Fade as the anchor scrolls out of the panel viewport (80px transition
-    // zone at each edge so it eases out instead of popping).
     const FADE = 80;
     const mid = ar.top + ar.height / 2;
     let opacity = 1;
@@ -320,30 +395,41 @@ export function mountWebView({
     else if (mid < pr.top + FADE) opacity = (mid - pr.top) / FADE;
     else if (mid > pr.bottom) opacity = 0;
     else if (mid > pr.bottom - FADE) opacity = (pr.bottom - mid) / FADE;
-    pop.style.opacity = String(Math.max(0, Math.min(1, opacity)));
+    opacity = Math.max(0, Math.min(1, opacity));
+    pop.style.opacity = String(opacity);
+    // Fully faded popovers shouldn't intercept clicks on the panel behind.
+    pop.style.pointerEvents = opacity > 0.05 ? "auto" : "none";
   }
 
-  // Open memo on bold click (bold-only mode only); follow scroll & resize.
+  function positionAllMemoPopovers(): void {
+    for (const e of memoPopovers.values()) positionMemoEntry(e);
+  }
+
+  // Click a bold in bold-only mode → open / focus its memo popover.
   panel.addEventListener("click", (e) => {
     if (!panel.classList.contains("is-bold-only")) return;
     const t = e.target as HTMLElement;
     const strong = t.closest(".dokki-panel-body strong") as HTMLElement | null;
     if (!strong || !panel.contains(strong)) return;
-    if (memoState && memoState.anchor === strong) {
-      closeMemoPopover();
+    if (memoPopovers.has(strong)) {
+      memoPopovers.get(strong)!.textarea.focus();
       return;
     }
-    if (lastOpenedBook) openMemoPopover(strong, lastOpenedBook.filePath);
+    if (lastOpenedBook) {
+      const entry = createMemoPopover(strong, lastOpenedBook.filePath);
+      if (entry) setTimeout(() => entry.textarea.focus(), 20);
+    }
   });
-  panel.addEventListener("scroll", () => updateMemoPosition());
-  window.addEventListener("resize", () => updateMemoPosition());
-  // Click anywhere outside the popover (and outside a bold) closes it.
+  panel.addEventListener("scroll", () => positionAllMemoPopovers());
+  window.addEventListener("resize", () => positionAllMemoPopovers());
+  // Click outside any popover (and outside a bold) drops the empty ones.
+  // Saved popovers stay pinned — they're meant to live alongside their bold.
   document.addEventListener("mousedown", (e) => {
-    if (!memoState) return;
+    if (!memoPopovers.size) return;
     const t = e.target as HTMLElement;
-    if (memoState.popover.contains(t)) return;
+    if (t.closest(".dokki-memo-popover")) return;
     if (t.closest(".dokki-panel-body strong")) return;
-    closeMemoPopover();
+    removeEmptyMemoPopovers();
   });
 
   // Movable page-index popover (left side) — a table of contents for the open
@@ -377,7 +463,8 @@ export function mountWebView({
       const on = panel.classList.toggle("is-bold-only");
       boldOnlyBtn.classList.toggle("is-active", on);
       boldOnlyBtn.textContent = on ? "전체" : "볼드만";
-      if (!on) closeMemoPopover();
+      if (on) showSavedMemoPopovers();
+      else removeAllMemoPopovers();
     });
     inner.appendChild(boldOnlyBtn);
 
@@ -843,7 +930,7 @@ export function mountWebView({
   }
 
   function closePanel() {
-    closeMemoPopover();
+    removeAllMemoPopovers();
     panel.classList.remove("is-open");
     panel.classList.remove("is-bold-only");
     panelBackdrop.classList.remove("is-open");
@@ -1112,6 +1199,7 @@ export function mountWebView({
 
   function renderNonfiction() {
     nonfictionWrap.innerHTML = "";
+    nonfictionWrap.appendChild(nfMarquee); // re-attach: innerHTML clobbered it
     const pool = filtered(state, books).filter(isNonfiction);
     if (!pool.length) return;
 
@@ -1132,16 +1220,36 @@ export function mountWebView({
         pv.textContent = preview;
         row.appendChild(pv);
       }
-      row.addEventListener("click", () => openNote(b));
+      row.addEventListener("click", () => {
+        if (suppressOpen) {
+          suppressOpen = false; // swallow the click that ended a marquee drag
+          return;
+        }
+        if (selectedPaths.size) {
+          selectedPaths.clear();
+          applySelectionClasses();
+        }
+        openNote(b);
+      });
       if (!isDemoPath(b.filePath)) {
         row.addEventListener("contextmenu", (e) => {
           e.preventDefault();
+          // Multi-select right-click → bulk delete (like the book stack).
+          if (selectedPaths.size > 1 && selectedPaths.has(b.filePath)) {
+            openMultiDeleteMenu([...selectedPaths], e.clientX, e.clientY);
+            return;
+          }
+          if (selectedPaths.size) {
+            selectedPaths.clear();
+            applySelectionClasses();
+          }
           openSpineMenu(b, e.clientX, e.clientY);
         });
       }
       list.appendChild(row);
     }
     nonfictionWrap.appendChild(list);
+    applySelectionClasses();
   }
 
   function openSpineMenu(b: BookNote, x: number, y: number) {
