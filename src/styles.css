@@ -780,6 +780,18 @@ html.dokki-no-splash #dokki-splash { display: none; }
   background: none; /* highlight gradient is overkill when only bolds are shown */
   margin: 0 0 14px;
   padding: 0;
+  cursor: pointer;
+}
+.dokki-panel.is-bold-only .dokki-panel-body strong:hover {
+  background: var(--background-secondary);
+}
+.dokki-panel.is-bold-only .dokki-panel-body strong.has-memo::after {
+  content: "•";
+  color: var(--dokki-link, #4a6fa5);
+  margin-left: 8px;
+  font-size: 0.9em;
+  line-height: 1;
+  vertical-align: 0.05em;
 }
 .dokki-panel.is-bold-only .dokki-panel-body strong em {
   font-style: italic;
@@ -797,6 +809,37 @@ html.dokki-no-splash #dokki-splash { display: none; }
 .dokki-panel.is-bold-only .dokki-panel-comment,
 .dokki-panel.is-bold-only .dokki-panel-external,
 .dokki-panel.is-bold-only .dokki-panel-preamble { display: none; }
+
+/* Memo popover — sits to the left of the note panel (or above the bold on
+   mobile), follows the anchored bold as the panel scrolls, fades at the
+   panel's vertical edges. */
+.dokki-memo-popover {
+  position: fixed;
+  width: 240px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.10);
+  z-index: 22; /* above the note panel (20) and the backdrop (>0) */
+  /* Only fade transitions — position must track the scroll instantly, or the
+     popover lags behind the bold it's anchored to. */
+  transition: opacity 0.18s ease;
+}
+.dokki-memo-textarea {
+  width: 100%;
+  min-height: 96px;
+  max-height: 240px;
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: vertical;
+  font-family: var(--font-text);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--text-normal);
+}
+.dokki-memo-textarea::placeholder { color: var(--text-faint); }
 
 /* head: cover + title */
 .dokki-panel-head {

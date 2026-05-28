@@ -9,6 +9,7 @@ import { isCloudEnabled } from "./supabase";
 import { signInWith, signOut, userLabel, getUser } from "./auth";
 import { extractCoverColor } from "./cover-color";
 import { getWishlist, addWishlist, removeWishlist, type WishItem } from "./wishlist";
+import { getMemo, setMemo, memoBolds } from "./memos";
 
 export interface WebViewOptions {
   books: BookNote[];
@@ -221,6 +222,116 @@ export function mountWebView({
     if (hit) openNote(hit);
   });
 
+  // Memo popover — in bold-only mode, clicking a `<strong>` excerpt opens a
+  // small textarea anchored next to that bold. Follows the bold as the panel
+  // scrolls; fades at the top/bottom of the panel viewport.
+  let memoState: {
+    anchor: HTMLElement;
+    filePath: string;
+    boldText: string;
+    popover: HTMLElement;
+    textarea: HTMLTextAreaElement;
+  } | null = null;
+
+  function openMemoPopover(anchor: HTMLElement, filePath: string) {
+    closeMemoPopover();
+    const boldText = (anchor.textContent ?? "").trim();
+    if (!boldText) return;
+
+    const popover = document.createElement("div");
+    popover.className = "dokki-memo-popover";
+    const ta = document.createElement("textarea");
+    ta.className = "dokki-memo-textarea";
+    ta.placeholder = "메모…";
+    ta.value = getMemo(filePath, boldText);
+    popover.appendChild(ta);
+    document.body.appendChild(popover);
+
+    const persist = () => {
+      const v = ta.value;
+      setMemo(filePath, boldText, v);
+      anchor.classList.toggle("has-memo", v.trim().length > 0);
+    };
+    ta.addEventListener("input", persist);
+    ta.addEventListener("blur", persist);
+    ta.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeMemoPopover();
+    });
+
+    memoState = { anchor, filePath, boldText, popover, textarea: ta };
+    updateMemoPosition();
+    setTimeout(() => ta.focus(), 20);
+  }
+
+  function closeMemoPopover() {
+    if (!memoState) return;
+    setMemo(memoState.filePath, memoState.boldText, memoState.textarea.value);
+    memoState.anchor.classList.toggle(
+      "has-memo",
+      memoState.textarea.value.trim().length > 0,
+    );
+    memoState.popover.remove();
+    memoState = null;
+  }
+
+  function updateMemoPosition() {
+    if (!memoState) return;
+    const ar = memoState.anchor.getBoundingClientRect();
+    const pr = panel.getBoundingClientRect();
+    const pop = memoState.popover;
+    const popW = pop.offsetWidth;
+    const popH = pop.offsetHeight;
+
+    // Prefer to sit on the panel's left flank. On narrow viewports there's no
+    // room there, so flip to floating above (or below) the anchor instead.
+    let top: number;
+    let left: number;
+    if (pr.left >= popW + 24) {
+      left = pr.left - popW - 16;
+      top = ar.top;
+    } else {
+      left = Math.max(8, Math.min(window.innerWidth - popW - 8, ar.left));
+      top = ar.top - popH - 8;
+      if (top < 8) top = ar.bottom + 8;
+    }
+    pop.style.top = `${top}px`;
+    pop.style.left = `${left}px`;
+
+    // Fade as the anchor scrolls out of the panel viewport (80px transition
+    // zone at each edge so it eases out instead of popping).
+    const FADE = 80;
+    const mid = ar.top + ar.height / 2;
+    let opacity = 1;
+    if (mid < pr.top) opacity = 0;
+    else if (mid < pr.top + FADE) opacity = (mid - pr.top) / FADE;
+    else if (mid > pr.bottom) opacity = 0;
+    else if (mid > pr.bottom - FADE) opacity = (pr.bottom - mid) / FADE;
+    pop.style.opacity = String(Math.max(0, Math.min(1, opacity)));
+  }
+
+  // Open memo on bold click (bold-only mode only); follow scroll & resize.
+  panel.addEventListener("click", (e) => {
+    if (!panel.classList.contains("is-bold-only")) return;
+    const t = e.target as HTMLElement;
+    const strong = t.closest(".dokki-panel-body strong") as HTMLElement | null;
+    if (!strong || !panel.contains(strong)) return;
+    if (memoState && memoState.anchor === strong) {
+      closeMemoPopover();
+      return;
+    }
+    if (lastOpenedBook) openMemoPopover(strong, lastOpenedBook.filePath);
+  });
+  panel.addEventListener("scroll", () => updateMemoPosition());
+  window.addEventListener("resize", () => updateMemoPosition());
+  // Click anywhere outside the popover (and outside a bold) closes it.
+  document.addEventListener("mousedown", (e) => {
+    if (!memoState) return;
+    const t = e.target as HTMLElement;
+    if (memoState.popover.contains(t)) return;
+    if (t.closest(".dokki-panel-body strong")) return;
+    closeMemoPopover();
+  });
+
   // Movable page-index popover (left side) — a table of contents for the open
   // note. Drag it by the header; its position persists across notes.
   const pageIndex = document.createElement("nav");
@@ -252,6 +363,7 @@ export function mountWebView({
       const on = panel.classList.toggle("is-bold-only");
       boldOnlyBtn.classList.toggle("is-active", on);
       boldOnlyBtn.textContent = on ? "전체" : "볼드만";
+      if (!on) closeMemoPopover();
     });
     inner.appendChild(boldOnlyBtn);
 
@@ -338,6 +450,17 @@ export function mountWebView({
       pagesEl.appendChild(block);
     }
     inner.appendChild(pagesEl);
+
+    // Mark every bold that already has a saved memo so users can see at a
+    // glance which excerpts they've annotated (the dot is only shown by CSS
+    // in bold-only mode — clean in normal reading mode).
+    const memos = memoBolds(b.filePath);
+    if (memos.size) {
+      const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+      inner.querySelectorAll<HTMLElement>(".dokki-panel-body strong").forEach((el) => {
+        if (memos.has(norm(el.textContent ?? ""))) el.classList.add("has-memo");
+      });
+    }
 
     // Backlinks — other notes that wikilink (`[[Title]]` / `![[Title]]`) to
     // this one. Especially useful for the 비문학 excerpts, which are usually
@@ -706,6 +829,7 @@ export function mountWebView({
   }
 
   function closePanel() {
+    closeMemoPopover();
     panel.classList.remove("is-open");
     panel.classList.remove("is-bold-only");
     panelBackdrop.classList.remove("is-open");
