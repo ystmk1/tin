@@ -252,7 +252,16 @@ export function mountWebView({
       setMemo(filePath, boldText, v);
       anchor.classList.toggle("has-memo", v.trim().length > 0);
     };
-    ta.addEventListener("input", persist);
+    const autosize = () => {
+      ta.style.height = "auto";
+      ta.style.height = ta.scrollHeight + "px";
+      // The popover grew/shrank → re-anchor (fade boundary depends on size).
+      updateMemoPosition();
+    };
+    ta.addEventListener("input", () => {
+      persist();
+      autosize();
+    });
     ta.addEventListener("blur", persist);
     ta.addEventListener("keydown", (e) => {
       if (e.key === "Escape") closeMemoPopover();
@@ -260,7 +269,12 @@ export function mountWebView({
 
     memoState = { anchor, filePath, boldText, popover, textarea: ta };
     updateMemoPosition();
-    setTimeout(() => ta.focus(), 20);
+    // Once attached we can read scrollHeight to set the initial height from
+    // saved content (single line when empty, taller when there's existing memo).
+    setTimeout(() => {
+      autosize();
+      ta.focus();
+    }, 20);
   }
 
   function closeMemoPopover() {

@@ -4,6 +4,7 @@ import { mountWebView, type WebViewHandle } from "./view-web";
 import { initAuth, onAuthChange } from "./auth";
 import { initMetadata } from "./note-metadata";
 import { initWishlist } from "./wishlist";
+import { initMemos } from "./memos";
 import {
   loadBooks,
   uploadNotes,
@@ -24,7 +25,7 @@ void bootstrap();
 async function bootstrap() {
   // 1) Metadata cache (localStorage first → instant), then initial notes
   //    (demo when logged out). Mount immediately.
-  await Promise.all([initMetadata(), initWishlist()]);
+  await Promise.all([initMetadata(), initWishlist(), initMemos()]);
   const initial = await loadBooks();
   view = mountWebView({
     books: initial.books,
@@ -45,7 +46,7 @@ async function bootstrap() {
 }
 
 async function refresh() {
-  await Promise.all([initMetadata(), initWishlist()]);
+  await Promise.all([initMetadata(), initWishlist(), initMemos()]);
   const { books, isDemo } = await loadBooks();
   view?.reload(books, isDemo);
 }

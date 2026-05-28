@@ -809,17 +809,27 @@ html.dokki-no-splash #dokki-splash { display: none; }
 .dokki-panel.is-bold-only .dokki-panel-comment,
 .dokki-panel.is-bold-only .dokki-panel-external,
 .dokki-panel.is-bold-only .dokki-panel-preamble { display: none; }
+/* Block elements inside the body keep their own explicit dimensions and would
+   still leave gaps even when their text is collapsed by font-size:0. Drop
+   them outright so bold-only stays a tight stack of highlights. */
+.dokki-panel.is-bold-only .dokki-panel-body .dokki-skip,
+.dokki-panel.is-bold-only .dokki-panel-body .dokki-subheading,
+.dokki-panel.is-bold-only .dokki-panel-body .dokki-blockquote,
+.dokki-panel.is-bold-only .dokki-panel-body .dokki-embed,
+.dokki-panel.is-bold-only .dokki-panel-body .dokki-wikilink { display: none; }
 
 /* Memo popover — sits to the left of the note panel (or above the bold on
    mobile), follows the anchored bold as the panel scrolls, fades at the
    panel's vertical edges. */
 .dokki-memo-popover {
   position: fixed;
-  width: 240px;
+  width: 260px;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 10px;
-  padding: 8px;
+  border-radius: 12px;
+  /* Wide inner padding on all sides, like the TOC popover — the textarea
+     gets real breathing room rather than hugging the edges. */
+  padding: 16px 18px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.10);
   z-index: 22; /* above the note panel (20) and the backdrop (>0) */
   /* Only fade transitions — position must track the scroll instantly, or the
@@ -827,13 +837,17 @@ html.dokki-no-splash #dokki-splash { display: none; }
   transition: opacity 0.18s ease;
 }
 .dokki-memo-textarea {
+  display: block;
   width: 100%;
-  min-height: 96px;
-  max-height: 240px;
+  /* Starts as a single line; JS sets `height` to scrollHeight on every input
+     so the popover grows with the content. No drag handle, no scrollbar. */
+  min-height: 1.55em;
   border: none;
   outline: none;
   background: transparent;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
+  padding: 0;
   font-family: var(--font-text);
   font-size: 0.86rem;
   line-height: 1.55;
