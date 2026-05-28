@@ -85,11 +85,19 @@ function nameOf(f: TFile): string {
   return f.name;
 }
 
-/** Does `f`'s vault path sit inside `folder` (or equal it)? */
+/**
+ * Does `f`'s vault path sit inside `folder` (or equal it)?
+ *
+ * Both sides are NFC-normalized before comparison — a Korean folder like
+ * "조각" survives as NFC when typed in the settings field, but files that
+ * originated on macOS HFS+ keep their jamo decomposed (NFD), and a byte-
+ * for-byte string match would silently miss them.
+ */
 function inFolder(f: TFile, folder: string): boolean {
-  const prefix = folder.trim().replace(/^\/+|\/+$/g, "");
+  const prefix = folder.trim().replace(/^\/+|\/+$/g, "").normalize("NFC");
   if (!prefix) return false;
-  return f.path === prefix || f.path.startsWith(prefix + "/");
+  const fp = f.path.normalize("NFC");
+  return fp === prefix || fp.startsWith(prefix + "/");
 }
 
 export async function runSync(
@@ -129,6 +137,19 @@ export async function runSync(
   const cloudListOk = !listErr;
 
   const classified = classifyVault(app, opts.folder, opts.fragmentFolder);
+  // Diagnostic: log the first few markdown paths so users (and us) can compare
+  // what Obsidian thinks the paths are with what they typed into settings.
+  const allPaths = app.vault.getMarkdownFiles().map((f) => f.path);
+  console.log("[DoKKi sync] vault sample paths:", allPaths.slice(0, 10));
+  console.log("[DoKKi sync] book folder setting:", JSON.stringify(opts.folder));
+  console.log("[DoKKi sync] fragment folder setting:", JSON.stringify(opts.fragmentFolder));
+  console.log(
+    "[DoKKi sync] classified counts — book:",
+    classified.filter((c) => !c.isFragment).length,
+    "fragment:",
+    classified.filter((c) => c.isFragment).length,
+  );
+
   const rowsToUpsert: Array<{
     user_id: string;
     filename: string;
@@ -203,6 +224,15 @@ export async function runSync(
       .in("filename", missingLocally);
     if (error) result.errors.push(`삭제 실패: ${error.message}`);
     else result.removed = missingLocally.length;
+  }
+
+  // If the user set a fragment folder but nothing matched, surface the most
+  // likely culprits: the typed path and a few real vault paths to compare.
+  if (opts.fragmentFolder && result.fragmentsDetected === 0) {
+    const sample = allPaths.slice(0, 5).join(" / ") || "(빈 vault)";
+    result.errors.push(
+      `조각 폴더 "${opts.fragmentFolder}" 와 매칭되는 .md 0건. 실제 vault 경로 샘플: ${sample}`,
+    );
   }
 
   return result;
