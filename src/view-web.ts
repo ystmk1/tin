@@ -377,16 +377,22 @@ export function mountWebView({
 
     let top: number;
     let left: number;
+    let hasTail = false;
     if (pr.left >= popW + 24) {
+      // Sits on the panel's left flank with a tail pointing to the bold.
+      // Top aligned with the bold so users can tell which one it belongs to.
       left = pr.left - popW - 16;
       top = ar.top;
+      hasTail = true;
     } else {
+      // Narrow viewport — float above/below the anchor; no tail in this mode.
       left = Math.max(8, Math.min(window.innerWidth - popW - 8, ar.left));
       top = ar.top - popH - 8;
       if (top < 8) top = ar.bottom + 8;
     }
     pop.style.top = `${top}px`;
     pop.style.left = `${left}px`;
+    pop.classList.toggle("has-tail", hasTail);
 
     const FADE = 80;
     const mid = ar.top + ar.height / 2;

@@ -823,18 +823,44 @@ html.dokki-no-splash #dokki-splash { display: none; }
    panel's vertical edges. */
 .dokki-memo-popover {
   position: fixed;
-  width: 260px;
+  /* Speech-bubble feel — wider than before so a multi-line bold and its memo
+     can read side-by-side without the popover wrapping every other word. */
+  width: 480px;
+  max-width: calc(100vw - 24px);
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 12px;
-  /* Wide inner padding on all sides, like the TOC popover — the textarea
-     gets real breathing room rather than hugging the edges. */
-  padding: 16px 18px;
+  padding: 14px 16px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.10);
   z-index: 22; /* above the note panel (20) and the backdrop (>0) */
   /* Only fade transitions — position must track the scroll instantly, or the
      popover lags behind the bold it's anchored to. */
   transition: opacity 0.18s ease;
+}
+/* Tail pointing toward the panel (where the anchored bold is). Two stacked
+   triangles: the back one carries the border color, the front one the bg,
+   so the bubble outline reads continuously around the tail. Only shown when
+   the popover sits to the left of the panel (the typical desktop layout);
+   on the flipped above/below position the bubble floats untethered. */
+.dokki-memo-popover.has-tail::before,
+.dokki-memo-popover.has-tail::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+.dokki-memo-popover.has-tail::before {
+  top: 14px;
+  right: -10px;
+  border-width: 10px 0 10px 10px;
+  border-color: transparent transparent transparent var(--background-modifier-border);
+}
+.dokki-memo-popover.has-tail::after {
+  top: 15px;
+  right: -8px;
+  border-width: 9px 0 9px 9px;
+  border-color: transparent transparent transparent var(--background-primary);
 }
 .dokki-memo-textarea {
   display: block;
