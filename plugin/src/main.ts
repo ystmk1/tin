@@ -56,10 +56,10 @@ export default class DokkiPlugin extends Plugin {
 
     // Ribbon = quick sync (the in-Obsidian explorer view has been retired —
     // the canonical viewer is the DoKKi web app).
-    this.addRibbonIcon("refresh-cw", "DoKKi 동기화", () => void this.syncNow());
+    this.addRibbonIcon("refresh-cw", "tin 동기화", () => void this.syncNow());
     this.addCommand({
       id: "dokki-sync",
-      name: "DoKKi 동기화 (변경된 노트만 업로드)",
+      name: "tin 동기화 (변경된 노트만 업로드)",
       callback: () => void this.syncNow(),
     });
     this.addCommand({
@@ -100,10 +100,10 @@ export default class DokkiPlugin extends Plugin {
     }
     const userId = await this.supabase.getUserId();
     if (!userId) {
-      new Notice("로그인이 필요합니다. 설정 → DoKKi 에서 로그인하세요.");
+      new Notice("로그인이 필요합니다. 설정 → tin 에서 로그인하세요.");
       return;
     }
-    new Notice("DoKKi 동기화 중…");
+    new Notice("tin 동기화 중…");
     const result = await runSync(this.app, client, userId, this.settings.syncHashes, {
       folder: this.settings.notesFolder,
       fragmentFolder: this.settings.fragmentFolder,
@@ -131,7 +131,7 @@ class PageFixModal extends Modal {
     contentEl.empty();
     contentEl.createEl("h3", { text: `페이지 양식 정리 제안 (${this.fixes.length}곳)` });
     contentEl.createEl("p", {
-      text: "아래 줄을 DoKKi 표준 형식 “##### Np.” 로 바꿉니다.",
+      text: "아래 줄을 tin 표준 형식 “##### Np.” 로 바꿉니다.",
       cls: "dokki-fix-desc",
     });
 
@@ -269,7 +269,7 @@ class DokkiSettingTab extends PluginSettingTab {
     new Setting(c)
       .setName("세션 붙여넣기 (OAuth 우회)")
       .setDesc(
-        "웹 DoKKi에서 로그인 → 개발자 도구 → Application → Local Storage → 'sb-...-auth-token' 값(JSON)을 복사해 붙여넣고 [적용].",
+        "웹 tin에서 로그인 → 개발자 도구 → Application → Local Storage → 'sb-...-auth-token' 값(JSON)을 복사해 붙여넣고 [적용].",
       )
       .addTextArea((t) => {
         t.inputEl.rows = 3;

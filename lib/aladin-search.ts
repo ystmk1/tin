@@ -55,7 +55,7 @@ export async function searchAladinBooks(
       // Some Korean APIs return HTML to Node's default UA — set a
       // browser-like UA so we get JSON consistently from edge runtimes.
       "User-Agent":
-        "Mozilla/5.0 (DoKKi book search; +https://github.com/ystmk1/DoKKi)",
+        "Mozilla/5.0 (tin book search; +https://github.com/ystmk1/tin)",
       Accept: "application/json, text/javascript;q=0.9, */*;q=0.5",
     },
   });

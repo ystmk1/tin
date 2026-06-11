@@ -249,7 +249,7 @@ export function formatSyncSummary(r: SyncResult): string {
 }
 
 export function showSyncResult(r: SyncResult): void {
-  new Notice(`DoKKi 동기화: ${formatSyncSummary(r)}`);
+  new Notice(`tin 동기화: ${formatSyncSummary(r)}`);
   // Always-visible diagnostic: shows what the plugin actually thought the
   // fragment folder was — easiest way to spot a path-mismatch typo.
   new Notice(`조각 폴더 설정값: "${r.fragmentFolderUsed || "(빈 값)"}"`, 6_000);

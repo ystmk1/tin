@@ -1,8 +1,8 @@
 <p align="left">
-  <img src="public/android-chrome-192x192.png" alt="DoKKi" width="72" height="72" />
+  <img src="public/android-chrome-192x192.png" alt="tin" width="72" height="72" />
 </p>
 
-# DoKKi
+# tin
 
 독서 발췌 노트 탐색기. 메인 화면은 세 층으로 구성됩니다.
 

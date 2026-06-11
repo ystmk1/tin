@@ -77,7 +77,7 @@ export function mountWebView({
   brand.className = "dokki-brand";
   brand.href = "/";
   const brandName = document.createElement("span");
-  brandName.textContent = "도끼";
+  brandName.textContent = "tin";
   brand.appendChild(brandName);
   header.appendChild(brand);
   const headerRight = document.createElement("div");
@@ -250,7 +250,7 @@ export function mountWebView({
   footer.className = "dokki-footer";
   const repoLink = document.createElement("a");
   repoLink.className = "dokki-repo-link";
-  repoLink.href = "https://github.com/ystmk1/DoKKi";
+  repoLink.href = "https://github.com/ystmk1/tin";
   repoLink.target = "_blank";
   repoLink.rel = "noopener";
   repoLink.textContent = "GitHub →";

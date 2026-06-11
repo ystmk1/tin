@@ -33,3 +33,10 @@ public/fonts/
 .env
 .env.local
 .env.*.local
+
+# personal / internal docs — kept locally, not pushed
+SUPABASE_SETUP.md
+handover*.md
+
+# favicon staging folder (final assets live in public/)
+favicon/

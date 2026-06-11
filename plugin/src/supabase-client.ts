@@ -158,7 +158,7 @@ export class SupabaseService {
       return;
     }
     await this.persistSession(data.session);
-    new Notice("DoKKi 로그인 완료.");
+    new Notice("tin 로그인 완료.");
   }
 
   async signOut(): Promise<void> {

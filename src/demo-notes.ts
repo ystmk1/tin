@@ -17,7 +17,7 @@ const DEMO_FILES: DemoFile[] = [
   {
     filename: "1. 노트 양식 안내.md",
     content: `---
-author: DoKKi 가이드
+author: tin 가이드
 status: 완독
 start: 2026-01-01
 finish: 2026-01-02
@@ -25,7 +25,7 @@ tags:
   - ☆☆☆☆☆
   - 안내
   - 사용법
-publisher: DoKKi
+publisher: tin
 comment: 로그인하고 본인의 .md 파일을 올리면 이 데모 대신 내 노트가 보입니다. 이 노트는 양식 설명용이에요.
 ---
 
@@ -50,14 +50,14 @@ comment: 로그인하고 본인의 .md 파일을 올리면 이 데모 대신 내
   {
     filename: "2. 별점과 상태.md",
     content: `---
-author: DoKKi 가이드
+author: tin 가이드
 status: 132p. 중단
 start: 2026-02-10
 tags:
   - ☆☆☆
   - 안내
   - 속성
-publisher: DoKKi
+publisher: tin
 comment: properties(프론트매터)의 별점·상태·저자·출판사가 어떻게 표시되는지 보여주는 데모입니다.
 ---
 
@@ -74,15 +74,15 @@ status에 "완독", "읽는 중", "132p. 중단" 처럼 적으면 제목 아래 
   {
     filename: "3. 연결망 그래프.md",
     content: `---
-author: DoKKi 가이드
+author: tin 가이드
 status: 읽는 중
 start: 2026-03-01
 tags:
   - ☆☆☆☆
   - 안내
   - 사용법
-publisher: DoKKi
-comment: 같은 저자나 같은 태그를 공유하는 노트끼리 그래프에서 가지로 이어집니다. 이 데모 셋은 모두 "DoKKi 가이드"가 저자라 서로 연결돼요.
+publisher: tin
+comment: 같은 저자나 같은 태그를 공유하는 노트끼리 그래프에서 가지로 이어집니다. 이 데모 셋은 모두 "tin 가이드"가 저자라 서로 연결돼요.
 ---
 
 ##### 5
