@@ -1,0 +1,501 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   tin · curation — print-catalog aesthetics
+   Full-viewport plate, extreme type contrast, matte solid colour, much air.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --paper: #f4f4f2;
+  --charcoal: #121212;
+  --ink: #1a1a1a;
+  --silver: #e5e5e5;
+
+  --sans: "Helvetica Neue", Helvetica, Pretendard, Arial, sans-serif;
+  --serif: "Times New Roman", Times, "Nanum Myeongjo", "AppleMyungjo", Batang, serif;
+
+  --hair: color-mix(in srgb, var(--fg) 80%, transparent);
+  --space: clamp(14px, 2.4vw, 40px);
+}
+
+:root[data-theme="light"] {
+  --bg: var(--paper);
+  --fg: var(--ink);
+}
+:root[data-theme="dark"] {
+  --bg: var(--charcoal);
+  --fg: var(--silver);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  transition: background 0.5s ease, color 0.5s ease;
+}
+
+#app {
+  height: 100dvh;
+  width: 100vw;
+  padding: var(--space);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: clamp(10px, 1.8vh, 22px);
+}
+
+/* ─── Catalog chrome: running header + crop-marked plate ─────────────────── */
+
+.chrome {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+}
+.chrome__brand {
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  text-transform: lowercase;
+  font-size: 13px;
+  opacity: 1;
+}
+.chrome__center {
+  letter-spacing: 0.32em;
+}
+
+#stage {
+  position: relative;
+  min-height: 0;
+}
+
+#plate {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* L-shaped crop marks at the plate corners. */
+.marks i {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  opacity: 0.45;
+  pointer-events: none;
+}
+.marks i::before,
+.marks i::after {
+  content: "";
+  position: absolute;
+  background: var(--fg);
+}
+.marks i::before {
+  width: 100%;
+  height: 1px;
+  top: 0;
+}
+.marks i::after {
+  width: 1px;
+  height: 100%;
+  left: 0;
+}
+.marks .tl {
+  top: -7px;
+  left: -7px;
+}
+.marks .tr {
+  top: -7px;
+  right: -7px;
+  transform: scaleX(-1);
+}
+.marks .bl {
+  bottom: -7px;
+  left: -7px;
+  transform: scaleY(-1);
+}
+.marks .br {
+  bottom: -7px;
+  right: -7px;
+  transform: scale(-1);
+}
+
+/* ─── Card shell + entrance ──────────────────────────────────────────────── */
+
+.card {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.card.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Template A · Swiss Punk — one giant word, the excerpt buried in micro type
+   ════════════════════════════════════════════════════════════════════════ */
+
+.card--a {
+  background: var(--key);
+  color: var(--contrast);
+}
+.a__keyword {
+  position: absolute;
+  left: -0.06em;
+  bottom: clamp(-1rem, -1.4vw, -0.5rem);
+  margin: 0;
+  font-weight: 800;
+  font-size: clamp(6rem, 30vw, 26rem);
+  line-height: 0.82;
+  letter-spacing: -0.045em;
+  white-space: nowrap;
+  max-width: 118%;
+}
+.a__excerpt {
+  position: absolute;
+  top: clamp(22px, 6vh, 64px);
+  left: clamp(22px, 5vw, 72px);
+  margin: 0;
+  max-width: min(26ch, 56%);
+  font-size: clamp(11px, 1.05vw, 13px);
+  line-height: 1.85;
+  letter-spacing: 0.005em;
+  word-break: keep-all;
+}
+.a__object {
+  position: absolute;
+  top: clamp(-30px, -3vw, -12px);
+  right: clamp(-40px, -4vw, -18px);
+  width: clamp(140px, 26vw, 360px);
+  aspect-ratio: 1;
+  opacity: 0.96;
+}
+.a__object svg {
+  width: 100%;
+  height: 100%;
+}
+.a__meta {
+  position: absolute;
+  right: clamp(20px, 4vw, 56px);
+  bottom: clamp(20px, 4vh, 52px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.a__page {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.a__credit {
+  opacity: 0.7;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Template B · Emil Ruder Grid — strict 4-quadrant matrix
+   ════════════════════════════════════════════════════════════════════════ */
+
+.card--b {
+  background: var(--bg);
+  color: var(--fg);
+  padding: clamp(10px, 1.6vw, 22px);
+}
+.b__grid {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  border: 1px solid var(--hair);
+}
+/* Centre cross hairlines. */
+.b__grid::before,
+.b__grid::after {
+  content: "";
+  position: absolute;
+  background: var(--hair);
+}
+.b__grid::before {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+}
+.b__grid::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+}
+.b__q {
+  position: relative;
+  padding: clamp(16px, 2.4vw, 38px);
+  min-width: 0;
+  min-height: 0;
+}
+.b__folio {
+  display: flex;
+  align-items: baseline;
+  gap: 0.1em;
+  letter-spacing: -0.04em;
+  font-weight: 700;
+}
+.b__folio-p {
+  font-size: clamp(1rem, 2.4vw, 2rem);
+  opacity: 0.6;
+}
+.b__folio-n {
+  font-size: clamp(3.5rem, 12vw, 9rem);
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+.b__q2 {
+  display: grid;
+  place-items: center;
+}
+.b__object {
+  width: min(60%, 200px);
+  aspect-ratio: 1;
+}
+.b__object svg {
+  width: 100%;
+  height: 100%;
+}
+.b__q3 {
+  display: flex;
+  align-items: flex-end;
+}
+.b__body {
+  max-height: 100%;
+  overflow: hidden;
+  font-size: clamp(12px, 1.15vw, 15px);
+  line-height: 1.78;
+  text-align: justify;
+  word-break: keep-all;
+  -webkit-mask-image: linear-gradient(to bottom, #000 84%, transparent);
+  mask-image: linear-gradient(to bottom, #000 84%, transparent);
+}
+.b__para {
+  margin: 0 0 0.9em;
+}
+.b__para:last-child {
+  margin-bottom: 0;
+}
+.b__q4 {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+.b__colophon {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 5px;
+}
+.b__title {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-size: clamp(14px, 1.5vw, 19px);
+}
+.b__author,
+.b__pub {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.62;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Template C · Classic Poster Cinema — lit frame, serif subtitle
+   ════════════════════════════════════════════════════════════════════════ */
+
+.card--c {
+  background: var(--charcoal);
+  color: var(--silver);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: clamp(14px, 2.6vh, 34px);
+  padding: clamp(26px, 4vw, 64px) clamp(22px, 5vw, 80px);
+  text-align: center;
+}
+.c__mark {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.9em;
+}
+.c__brand {
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  font-size: clamp(15px, 1.8vw, 22px);
+}
+.c__sn {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  opacity: 0.6;
+}
+.c__stage {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  place-items: center;
+  gap: clamp(12px, 2vh, 26px);
+  min-height: 0;
+}
+.c__frame {
+  height: 100%;
+  aspect-ratio: 4 / 5;
+  max-width: 100%;
+  display: grid;
+  place-items: center;
+  padding: clamp(18px, 3vw, 44px);
+  background:
+    radial-gradient(120% 120% at 50% 38%, color-mix(in srgb, var(--key) 64%, transparent), transparent 70%),
+    #0d0d0d;
+  border: 1px solid color-mix(in srgb, var(--key) 50%, transparent);
+  box-shadow:
+    0 40px 90px -30px rgba(0, 0, 0, 0.8),
+    inset 0 0 120px -40px rgba(0, 0, 0, 0.9);
+}
+.c__object {
+  width: 78%;
+  aspect-ratio: 1;
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.6));
+}
+.c__object svg {
+  width: 100%;
+  height: 100%;
+}
+.c__title {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(1.4rem, 3.4vw, 2.8rem);
+  letter-spacing: 0.02em;
+}
+.c__subtitle {
+  margin: 0 auto;
+  max-width: 62ch;
+  font-family: var(--serif);
+  font-size: clamp(13px, 1.5vw, 18px);
+  line-height: 1.7;
+  letter-spacing: 0.04em;
+  word-break: keep-all;
+  color: color-mix(in srgb, var(--silver) 92%, transparent);
+}
+.c__credit {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Controls — quiet, monochrome, letterspaced ─────────────────────────── */
+
+#controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(16px, 3vw, 44px);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--fg);
+}
+.ctl__group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ctl__btn,
+.ctl__tpl {
+  appearance: none;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  padding: 4px 2px;
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+}
+.ctl__btn {
+  font-size: 16px;
+  line-height: 1;
+}
+.ctl__btn:hover,
+.ctl__tpl:hover {
+  opacity: 0.95;
+}
+.ctl__tpl.is-on {
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.ctl__idx {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+.ctl__idx i {
+  font-style: normal;
+  opacity: 0.4;
+  margin: 0 2px;
+}
+.ctl__name {
+  text-transform: uppercase;
+  letter-spacing: 0.24em;
+  opacity: 0.55;
+  font-size: 10px;
+}
+.ctl__theme {
+  font-size: 15px;
+}
+
+/* ─── Narrow screens ─────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .chrome__center {
+    display: none;
+  }
+  .a__excerpt {
+    max-width: 72%;
+  }
+  .b__q {
+    padding: 14px;
+  }
+  #controls {
+    flex-wrap: wrap;
+    gap: 14px 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  body {
+    transition: none;
+  }
+}

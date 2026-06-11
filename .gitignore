@@ -40,3 +40,7 @@ handover*.md
 
 # favicon staging folder (final assets live in public/)
 favicon/
+
+# design planning / scratch — local only
+plan.md
+tinfavi.png

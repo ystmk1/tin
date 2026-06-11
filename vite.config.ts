@@ -64,6 +64,12 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       sourcemap: false,
       target: "es2020",
+      rollupOptions: {
+        input: {
+          main: "index.html",
+          curation: "curation.html",
+        },
+      },
     },
     server: { port: 5180 },
   };
