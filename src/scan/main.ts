@@ -28,6 +28,7 @@ const els = {
   advNote: $("advNote"),
   extractBtn: $<HTMLButtonElement>("extractBtn"),
   resetBtn: $<HTMLButtonElement>("resetBtn"),
+  autoAi: $<HTMLInputElement>("autoAi"),
   progress: $("progress"),
   bar: $("bar"),
   progressText: $("progressText"),
@@ -154,6 +155,11 @@ async function extract() {
     els.badge.textContent = badge;
     beforeClean = null;
     els.revertBtn.hidden = true;
+    els.progress.hidden = true;
+    // Chain straight into Gemini cleanup when it's available, so one click
+    // yields the fully-refined text (like the original two-step workflow).
+    const geminiReady = config.gemini || els.geminiKeys.value.trim() !== "";
+    if (els.autoAi.checked && geminiReady) await aiClean();
   } catch (e) {
     alert(e instanceof Error ? e.message : "오류가 발생했습니다.");
   } finally {

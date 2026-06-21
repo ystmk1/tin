@@ -75,14 +75,10 @@ export async function cleanText(text: string, opts: CleanOpts): Promise<string> 
   const chunks = chunkByParagraph(text);
   const result: string[] = [];
   for (let i = 0; i < chunks.length; i++) {
-    let refined: string;
-    try {
-      refined = await refineOne(chunks[i]);
-    } catch (e) {
-      // On failure keep the original chunk rather than losing it.
-      console.warn("[scan] clean chunk failed:", e);
-      refined = chunks[i];
-    }
+    // Let errors propagate so the UI can surface *why* the AI step failed
+    // (bad/expired model, missing key, quota) instead of silently leaving the
+    // un-refined text in place — which reads as "AI cleanup did nothing".
+    const refined = await refineOne(chunks[i]);
     result.push(refined);
     opts.onChunk?.(result.join("\n\n"), i + 1, chunks.length);
   }
