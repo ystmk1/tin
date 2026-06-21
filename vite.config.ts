@@ -1,5 +1,69 @@
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import { searchBooksCombined } from "./lib/book-search";
+import { callVisionAnnotate } from "./lib/vision-ocr";
+import { callGeminiClean, DEFAULT_MODEL } from "./lib/gemini-clean";
+
+// Dev mirror of the api/ocr.ts + api/gemini-clean.ts serverless functions so
+// the scan page works under `npm run dev`. Keys come from .env.local; if a key
+// is absent the endpoint reports { configured: false } and the client falls
+// back to a browser-entered key.
+function readJsonBody(req: import("http").IncomingMessage): Promise<any> {
+  return new Promise((resolve) => {
+    let data = "";
+    req.on("data", (c) => (data += c));
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(data || "{}"));
+      } catch {
+        resolve({});
+      }
+    });
+  });
+}
+
+function scanDevPlugin(visionKey?: string, geminiKey?: string, geminiModel?: string): Plugin {
+  return {
+    name: "tin-scan-dev",
+    configureServer(server) {
+      const json = (res: import("http").ServerResponse, status: number, body: unknown) => {
+        res.statusCode = status;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify(body));
+      };
+
+      server.middlewares.use("/api/ocr", async (req, res) => {
+        if (req.method === "GET") return json(res, 200, { configured: !!visionKey });
+        if (req.method !== "POST") return json(res, 405, { error: "method not allowed" });
+        if (!visionKey) return json(res, 501, { error: "GOOGLE_VISION_API_KEY 미설정", configured: false });
+        try {
+          const body = await readJsonBody(req);
+          const responses = await callVisionAnnotate(visionKey, body.requests ?? []);
+          return json(res, 200, { responses });
+        } catch (e) {
+          return json(res, 500, { error: e instanceof Error ? e.message : String(e) });
+        }
+      });
+
+      server.middlewares.use("/api/gemini-clean", async (req, res) => {
+        if (req.method === "GET") return json(res, 200, { configured: !!geminiKey });
+        if (req.method !== "POST") return json(res, 405, { error: "method not allowed" });
+        if (!geminiKey) return json(res, 501, { error: "GEMINI_API_KEY 미설정", configured: false });
+        try {
+          const body = await readJsonBody(req);
+          const text = await callGeminiClean({
+            apiKey: geminiKey,
+            text: String(body.text ?? ""),
+            customPrompt: String(body.customPrompt ?? ""),
+            model: (body.model && String(body.model)) || geminiModel || DEFAULT_MODEL,
+          });
+          return json(res, 200, { text });
+        } catch (e) {
+          return json(res, 500, { error: e instanceof Error ? e.message : String(e) });
+        }
+      });
+    },
+  };
+}
 
 function bookSearchDevPlugin(nlKey: string | undefined, aladinKey: string | undefined): Plugin {
   return {
@@ -58,7 +122,10 @@ export default defineConfig(({ mode }) => {
   return {
     root: ".",
     publicDir: "public",
-    plugins: [bookSearchDevPlugin(env.NL_API_KEY, env.ALADIN_TTB_KEY)],
+    plugins: [
+      bookSearchDevPlugin(env.NL_API_KEY, env.ALADIN_TTB_KEY),
+      scanDevPlugin(env.GOOGLE_VISION_API_KEY, env.GEMINI_API_KEY, env.GEMINI_MODEL),
+    ],
     build: {
       outDir: "dist",
       emptyOutDir: true,
@@ -68,6 +135,7 @@ export default defineConfig(({ mode }) => {
         input: {
           main: "index.html",
           curation: "curation.html",
+          scan: "scan.html",
         },
       },
     },
