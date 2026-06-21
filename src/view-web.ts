@@ -82,6 +82,12 @@ export function mountWebView({
   header.appendChild(brand);
   const headerRight = document.createElement("div");
   headerRight.className = "dokki-header-right";
+  // Rough entry point to the OCR scan page (design TBD).
+  const scanLink = document.createElement("a");
+  scanLink.className = "dokki-repo-link";
+  scanLink.href = "/scan.html";
+  scanLink.textContent = "스캔";
+  headerRight.appendChild(scanLink);
   const authSlot = document.createElement("div");
   authSlot.className = "dokki-auth";
   headerRight.appendChild(authSlot);

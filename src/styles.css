@@ -1105,7 +1105,9 @@ html.dokki-no-splash #dokki-splash { display: none; }
   margin: 3.8em 0 0.35em;
   line-height: 1.35;
 }
-.dokki-panel-body .dokki-subheading:first-child { margin-top: 0; }
+/* NOTE: no :first-child reset here. CSS :first-child ignores text nodes, so a
+   subheading sitting after body text is still the first *element* child and a
+   reset would wrongly kill its top gap. The wide top margin is wanted anyway. */
 .dokki-wikilink {
   color: var(--dokki-link, #4a6fa5);
   font-weight: 500;
