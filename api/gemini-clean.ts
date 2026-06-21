@@ -31,7 +31,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       apiKey: key,
       text,
       customPrompt,
-      model: reqModel || model || mod.DEFAULT_MODEL,
+      // Empty → callGeminiClean auto-detects the newest flash model.
+      model: reqModel || model || "",
     });
     res.status(200).json({ text: refined });
   } catch (e) {

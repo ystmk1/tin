@@ -61,6 +61,46 @@ function normalizeModel(model: string): string {
   return m.startsWith("models/") ? m : `models/${m}`;
 }
 
+// Cache the auto-detected model for the life of the process/page so we only
+// hit ListModels once.
+let detectedModel: string | null = null;
+
+/**
+ * When the caller doesn't pin a model, ask the API which models exist and pick
+ * the newest `flash` one that supports generateContent — same logic as the
+ * original Text Extractor. Falls back to DEFAULT_MODEL if the listing fails.
+ */
+export async function resolveFlashModel(
+  apiKey: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  if (detectedModel) return detectedModel;
+  try {
+    const res = await fetchImpl(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+    );
+    if (res.ok) {
+      const data = (await res.json()) as {
+        models?: { name: string; supportedGenerationMethods?: string[] }[];
+      };
+      const flash = (data.models || [])
+        .filter(
+          (m) =>
+            (m.supportedGenerationMethods || []).includes("generateContent") &&
+            m.name.includes("flash"),
+        )
+        .sort((a, b) => b.name.localeCompare(a.name))[0];
+      if (flash) {
+        detectedModel = flash.name; // e.g. "models/gemini-2.0-flash"
+        return detectedModel;
+      }
+    }
+  } catch {
+    /* fall through to default */
+  }
+  return DEFAULT_MODEL;
+}
+
 export interface GeminiCleanArgs {
   apiKey: string;
   text: string;
@@ -78,13 +118,15 @@ export async function callGeminiClean({
   apiKey,
   text,
   customPrompt = "",
-  model = DEFAULT_MODEL,
+  model = "",
   fetchImpl = fetch,
 }: GeminiCleanArgs): Promise<string> {
   if (!text || !text.trim()) return text;
 
+  // No explicit model → auto-detect the newest available flash model.
+  const chosen = model.trim() || (await resolveFlashModel(apiKey, fetchImpl));
   const url = `https://generativelanguage.googleapis.com/v1beta/${normalizeModel(
-    model,
+    chosen,
   )}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetchImpl(url, {

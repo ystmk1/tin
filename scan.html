@@ -70,10 +70,12 @@
                 <div class="keyfield" id="visionKeyField">
                   <label for="visionKey">Vision API 키 <span class="hint">OCR 추출용</span></label>
                   <input type="password" id="visionKey" placeholder="AIza…" autocomplete="off" />
+                  <a class="keylink" href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">키 발급 → Cloud Console (Vision API 활성화 필요)</a>
                 </div>
                 <div class="keyfield" id="geminiKeyField">
                   <label for="geminiKeys">Gemini API 키 <span class="hint">AI 정리용 · 줄바꿈으로 여러 개</span></label>
                   <textarea id="geminiKeys" rows="2" placeholder="AIza…&#10;AIza… (예비 키)"></textarea>
+                  <a class="keylink" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">키 발급 → Google AI Studio</a>
                 </div>
                 <div class="keyfield">
                   <label for="model">Gemini 모델 <span class="hint">비우면 기본값</span></label>

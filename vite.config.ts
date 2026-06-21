@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import { searchBooksCombined } from "./lib/book-search";
 import { callVisionAnnotate } from "./lib/vision-ocr";
-import { callGeminiClean, DEFAULT_MODEL } from "./lib/gemini-clean";
+import { callGeminiClean } from "./lib/gemini-clean";
 
 // Dev mirror of the api/ocr.ts + api/gemini-clean.ts serverless functions so
 // the scan page works under `npm run dev`. Keys come from .env.local; if a key
@@ -54,7 +54,8 @@ function scanDevPlugin(visionKey?: string, geminiKey?: string, geminiModel?: str
             apiKey: geminiKey,
             text: String(body.text ?? ""),
             customPrompt: String(body.customPrompt ?? ""),
-            model: (body.model && String(body.model)) || geminiModel || DEFAULT_MODEL,
+            // Empty → callGeminiClean auto-detects the newest flash model.
+            model: (body.model && String(body.model)) || geminiModel || "",
           });
           return json(res, 200, { text });
         } catch (e) {
