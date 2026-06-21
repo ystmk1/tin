@@ -2383,9 +2383,11 @@ function renderRatingEl(rating: number): HTMLElement {
 const BOLD_HTML = /\*\*((?:[^*]|\*(?!\*))+?)\*\*/g;
 // Italic: a single *…* span. Applied AFTER bold so the ** are already gone.
 const ITALIC_HTML = /\*([^*\n]+?)\*/g;
-// Subheadings (### Title) — used inside page bodies of short-story
-// collections etc. ## and # don't appear in user notes; ##### is the
-// page marker, parsed away earlier. We only handle exactly ###.
+// Subheadings (## / ### / #### Title) — used inside page bodies of short-story
+// collections etc. We accept 1–4 hashes with a required trailing space so a
+// mistyped level (## or ####) or a heading that hugs the previous line still
+// reads as a subheading instead of leaking raw `#`s into the prose. `#####` is
+// the page marker (5 hashes), parsed away earlier and never reaches here.
 // Display label for a tag: underscores read as spaces (e.g. 민음사_세계문학전집
 // → "민음사 세계문학전집"). The underscore stays in the stored/matched value.
 function tagLabel(t: string): string {
@@ -2414,7 +2416,7 @@ function bodyPreview(b: BookNote, max = 140): string {
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // ![alt](url) images
     .replace(/\*\*([^*]+)\*\*/g, "$1") // **bold**
     .replace(/\*([^*\n]+)\*/g, "$1") // *italic*
-    .replace(/^###[ \t]+/gm, "") // ### heading prefix
+    .replace(/^#{1,4}[ \t]+/gm, "") // # … #### heading prefix
     .replace(/^>\s?/gm, "") // > quote prefix
     .replace(/\s+/g, " ")
     .trim();
@@ -2447,7 +2449,7 @@ function backlinksFor(book: BookNote, all: BookNote[]): BookNote[] {
   return out;
 }
 
-const SUBHEADING_HTML = /^###[ \t]+(.+?)[ \t]*$/gm;
+const SUBHEADING_HTML = /^#{1,4}[ \t]+(.+?)[ \t]*$/gm;
 const EMBED = /!\[\[([^\]]+)\]\]/g; // ![[Note]] / ![[Note#sec|alias]] / ![[img.png]]
 const MD_IMAGE = /!\[([^\]]*)\]\(([^)\s]+)\)/g; // ![alt](url)
 const IMG_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
@@ -2465,14 +2467,12 @@ function renderBodyHTML(
   depth = 0,
 ): string {
   let html = body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  // ### Title → block subheading (before bold so its text can hold **bold**).
+  // --- Line-anchored block conversions first, while line starts are still
+  // intact. Both rely on `^`, so they must run before any newline-stripping
+  // below (otherwise a heading sitting directly on top of a quote would be
+  // glued to it and the `^&gt;` quote pass would no longer match). ---
+  // # … #### Title → block subheading (before bold so its text can hold **bold**).
   html = html.replace(SUBHEADING_HTML, '<span class="dokki-subheading">$1</span>');
-  // The gap around a heading is owned by its CSS margins (top = wider, bottom =
-  // tight), so strip the blank lines the user happened to type around it —
-  // otherwise typed blanks would stack on the margins inconsistently.
-  html = html
-    .replace(/(<span class="dokki-subheading">[^<]*<\/span>)\n+/g, "$1")
-    .replace(/\n+(<span class="dokki-subheading">)/g, "\n$1");
   // `> quote` lines → a quote box. `>` was escaped to `&gt;` above. Consecutive
   // `>` lines (incl. empty `>` lines used as line breaks) form one box; a line
   // without `>` ends it, so blank-line-separated groups become separate boxes.
@@ -2485,9 +2485,14 @@ function renderBodyHTML(
       .replace(/^\n+|\n+$/g, ""); // trim blank edges inside the box
     return `<span class="dokki-panel-external dokki-blockquote">${inner}</span>`;
   });
-  // Box spacing is owned by .dokki-blockquote margins; drop the literal newlines
-  // hugging each box so adjacent boxes get a consistent gap, not typed blanks.
+  // --- Now strip the blank lines the user happened to type around each block
+  // piece, on BOTH sides, so its vertical spacing is owned solely by CSS
+  // margins (consistent regardless of authoring) rather than by stray newlines
+  // stacking on top of the margins. A heading gets a wide top / tight bottom
+  // gap from .dokki-subheading; a quote box an even gap from .dokki-blockquote. ---
   html = html
+    .replace(/(<span class="dokki-subheading">[^<]*<\/span>)\n+/g, "$1")
+    .replace(/\n+(<span class="dokki-subheading">)/g, "$1")
     .replace(/(<span class="dokki-panel-external dokki-blockquote">[\s\S]*?<\/span>)\n+/g, "$1")
     .replace(/\n+(<span class="dokki-panel-external dokki-blockquote">)/g, "$1");
   // ![[…]] embeds → quote-styled block (display:block span, valid inside <pre>).
@@ -2498,6 +2503,11 @@ function renderBodyHTML(
     const innerHtml = resolved != null ? renderBodyHTML(resolved, undefined, depth + 1) : name;
     return `<span class="dokki-panel-external dokki-embed">${innerHtml}</span>`;
   });
+  // Embed spacing is owned by .dokki-embed margins too — drop a blank line
+  // typed right before it. (The closing side is left alone: an embed body is
+  // recursively rendered and may itself contain `</span>`, which a greedy
+  // match would mis-pair — the bottom margin handles that gap on its own.)
+  html = html.replace(/\n+(<span class="dokki-panel-external dokki-embed">)/g, "$1");
   // [[Note]] / [[Note#sec|alias]] → a clickable link to that note (the [[ ]]
   // markup is hidden). The panel resolves the target on click and opens it;
   // links to notes not in the library simply do nothing. Runs after EMBED so
