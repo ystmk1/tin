@@ -38,8 +38,6 @@ const els = {
   revertBtn: $<HTMLButtonElement>("revertBtn"),
   copyBtn: $<HTMLButtonElement>("copyBtn"),
   dlBtn: $<HTMLButtonElement>("dlBtn"),
-  statusText: $("statusText"),
-  status: $("status"),
 };
 
 let items: ScanItem[] = [];
@@ -72,12 +70,6 @@ async function initConfig() {
   parts.push(config.vision ? "Vision: 서버 키 사용" : "Vision: 브라우저 키 입력");
   parts.push(config.gemini ? "Gemini: 서버 키 사용" : "Gemini: 브라우저 키 입력");
   els.advNote.textContent = parts.join(" · ") + ". 입력한 키는 이 브라우저에만 저장됩니다.";
-  setStatus("ready", "준비 완료");
-}
-
-function setStatus(state: "ready" | "working" | "error", text: string) {
-  els.status.dataset.state = state;
-  els.statusText.textContent = text;
 }
 
 // ── file list (reorderable) ─────────────────────────────────────────────────
@@ -131,14 +123,12 @@ function renderFileList() {
 }
 
 async function addFiles(files: FileList | File[]) {
-  setStatus("working", "파일 분석 중…");
   try {
     const incoming = await intake(files);
     items = items.concat(incoming);
     renderFileList();
-    setStatus("ready", `${items.length}개 준비됨`);
   } catch (e) {
-    setStatus("error", e instanceof Error ? e.message : "파일 분석 실패");
+    alert(e instanceof Error ? e.message : "파일 분석 실패");
   }
 }
 
@@ -147,7 +137,6 @@ async function extract() {
   if (items.length === 0) return;
   els.extractBtn.disabled = true;
   els.progress.hidden = false;
-  setStatus("working", "추출 중…");
   const setProg = (pct: number, label: string) => {
     els.bar.style.width = pct + "%";
     els.progressText.textContent = label;
@@ -165,9 +154,7 @@ async function extract() {
     els.badge.textContent = badge;
     beforeClean = null;
     els.revertBtn.hidden = true;
-    setStatus("ready", "추출 완료");
   } catch (e) {
-    setStatus("error", e instanceof Error ? e.message : "오류");
     alert(e instanceof Error ? e.message : "오류가 발생했습니다.");
   } finally {
     els.progress.hidden = true;
@@ -235,7 +222,6 @@ els.resetBtn.addEventListener("click", () => {
   els.badge.textContent = "대기";
   beforeClean = null;
   els.revertBtn.hidden = true;
-  setStatus("ready", "초기화됨");
 });
 
 els.fixBtn.addEventListener("click", () => {

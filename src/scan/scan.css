@@ -56,32 +56,6 @@ body {
   padding: 3px 10px;
   border-radius: 4px;
 }
-.scan-title {
-  flex: 1;
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  color: var(--ink-dim);
-}
-.scan-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-}
-.scan-status .dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--ink-faint);
-}
-.scan-status[data-state="ready"] .dot { background: var(--accent); }
-.scan-status[data-state="working"] .dot { background: #b8860b; animation: pulse 1s infinite; }
-.scan-status[data-state="error"] .dot { background: var(--danger); }
-@keyframes pulse { 50% { opacity: 0.25; } }
-
 /* ─── workspace grid ─────────────────────────────────────────────────────── */
 .scan-grid {
   flex: 1;
@@ -293,6 +267,5 @@ textarea:focus { outline: none; border-color: var(--ink); }
 /* ─── narrow ─────────────────────────────────────────────────────────────── */
 @media (max-width: 820px) {
   .scan-grid { grid-template-columns: 1fr; }
-  .scan-title { display: none; }
   #result { min-height: 240px; }
 }
